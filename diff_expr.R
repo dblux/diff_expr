@@ -45,11 +45,6 @@ a2_col <- setdiff(1:30, a1_col)
 # Rename column names
 # colnames(control) <- paste0('C', 1:n_control)
 # colnames(patient) <- paste0('P', 1:n_patient)
-
-# Imports probeset annotations
-probeset_annot <- read.table("../info/microarray/HG-U133_Plus_2/annot_GEO-GPL570.tsv",
-                             sep="\t", header=T, row.names=1, stringsAsFactors=F, strip.white = T)
-
 # MAIN --------------------------------------------------------------------
 
 gfs_control_ds1 <- GFS(control_ds1)
@@ -233,27 +228,6 @@ sum(Y[,4] == 0)
 # ESSNet rotation test
 
 # HYPGEOM -----------------------------------------------------------------
-# Import breast metastasis data
-metastasis_data <- read.table("data/breast_metastasis/GSE2034/processed/data_labelled.tsv",
-                             header = T, row.names = 1)
-# Import subnetworks
-subnetworks <- read.table("data/subnetwork/hsa-nea/subnetworks-breast_metastasis.tsv",
-                          header = T)
-# Create gene list for each subnetwork
-list_subnetworks <- split(subnetworks[2:3], subnetworks$subnetwork_name)
-subnetwork_genelist <- lapply(list_subnetworks, function(x) sort(unique(unname(unlist(x)))))
-
-# Save subnetwork gene list
-subnetwork_matrix <- lapply(subnetwork_genelist, as.data.frame)
-subnetwork_df <- do.call(rbind, subnetwork_matrix)
-subnetwork_df["subnetwork"] <- sub("\\..*$", "", rownames(subnetwork_df))
-colnames(subnetwork_df)[1] <- "gene"
-subnetwork_df1 <- subnetwork_df[,2:1]
-rownames(subnetwork_df1) <- NULL
-write.table(subnetwork_df1,
-            "data/subnetwork/hsa-nea/subnet_genelist-breast-metastasis.tsv",
-            col.names = T, row.names = F, quote = F)
-
 # Import ovarian cancer data set 1
 # Not log2
 ovarian_data1 <- read.table("data/ovarian_cancer/GSE18521/processed/GSE18521_entrez1.tsv",
@@ -263,7 +237,7 @@ tumour_data1 <- ovarian_data1[11:62]
 
 # Ovarian cancer data set 2
 # Pre-processed using RMA - Log2 and quantile normalised
-ovarian_data2 <- read.table('data/ovarian_cancer/GSE26712/processed/processed_entrez.tsv',
+ovarian_data2 <- read.table('data/ovarian_cancer/GSE26712/processed/GSE26712_entrez.tsv',
                             header = T, row.names = 1)
 # Reverse the log2
 ovarian_data2a <- 2^ovarian_data2
@@ -305,3 +279,24 @@ sig_subnetworks1 <- names(hypgeom_pvalue1)[hypgeom_pvalue1 <= 0.05]
 hypgeom_pvalue2 <- lapply(list_genelist, hypgeom, significant_genes2)
 sig_subnetworks2 <- names(hypgeom_pvalue2)[hypgeom_pvalue1 <= 0.05]
 
+
+# Import breast metastasis data
+metastasis_data <- read.table("data/breast_metastasis/GSE2034/processed/data_labelled.tsv",
+                             header = T, row.names = 1)
+# Import subnetworks
+subnetworks <- read.table("data/subnetwork/hsa-nea/subnetworks-breast_metastasis.tsv",
+                          header = T)
+# Create gene list for each subnetwork
+list_subnetworks <- split(subnetworks[2:3], subnetworks$subnetwork_name)
+subnetwork_genelist <- lapply(list_subnetworks, function(x) sort(unique(unname(unlist(x)))))
+
+# Save subnetwork gene list
+subnetwork_matrix <- lapply(subnetwork_genelist, as.data.frame)
+subnetwork_df <- do.call(rbind, subnetwork_matrix)
+subnetwork_df["subnetwork"] <- sub("\\..*$", "", rownames(subnetwork_df))
+colnames(subnetwork_df)[1] <- "gene"
+subnetwork_df1 <- subnetwork_df[,2:1]
+rownames(subnetwork_df1) <- NULL
+write.table(subnetwork_df1,
+            "data/subnetwork/hsa-nea/subnet_genelist-breast-metastasis.tsv",
+            col.names = T, row.names = F, quote = F)
