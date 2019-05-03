@@ -29,7 +29,8 @@ generate_subnetwork <- function(df, gene_list, MIN_SIZE) {
       processed_df <- processed_df[-row_no,]
     }
   }
-  if (nrow(processed_df) != 0) {
+  # TODO: Check logic of tree
+  if (nrow(processed_df) >= (MIN_SIZE - 1)) {
     # Convert numeric matrix to string matrix in order to avoid vertex id
     char_array <- apply(data.matrix(processed_df), c(1, 2), as.character)
     sub_graphs <- graph_from_edgelist(char_array)
