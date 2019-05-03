@@ -4,7 +4,6 @@ library(igraph)
 source("functions.R")
 # detach(package:Rgraphviz)
 # Rgraphviz is built on graph package: graphNEL format
-
 setwd("~/projects/phd/diff_expr/")
 
 # FUNCTIONS ---------------------------------------------------------------
@@ -317,77 +316,7 @@ SUBNETWORK_FPATH <- "data/subnetwork/nea-pwapi/ovarian_cancer/subnetworks-nea_pw
 write.table(fltr_df_subnetworks, SUBNETWORK_FPATH,
             quote = F, sep = "\t", row.names = F, col.names = T)
 
-# PFSNET ------------------------------------------------------------------
-# Import ovarian cancer data set 1
-# Not log2
-ovarian_data1 <- read.table("data/ovarian_cancer/GSE18521/processed/GSE18521_entrez1.tsv",
-                            header = T, row.names = 1)
-gfs_ovarian_data1 <- GFS(ovarian_data1)
-control_data1 <- gfs_ovarian_data1[,1:10]
-tumour_data1 <- gfs_ovarian_data1[,11:62]
-
-# TODO: Preserve largest connected portion of graph
-# Create list of highly expressed genes
-mean_control_data1 <- apply(control_data1, 1, mean)
-highexpr_genes_data1_control <- names(mean_control_data1[mean_control_data1 > 0.5])
-mean_tumour_data1 <- apply(tumour_data1, 1, mean)
-highexpr_genes_data1_tumour <- names(mean_tumour_data1[mean_tumour_data1 > 0.5])
-
-# # Ovarian cancer data set 2
-# # Pre-processed using RMA - Log2 and quantile normalised
-# ovarian_data2 <- read.table('data/ovarian_cancer/GSE26712/processed/GSE26712_entrez.tsv',
-#                             header = T, row.names = 1)
-# # Reverse the log2
-# ovarian_data2a <- 2^ovarian_data2
-# gfs_ovarian_data2 <- GFS(ovarian_data2)
-# control_data2 <- ovarian_data2a[,1:10]
-# tumour_data2 <- ovarian_data2a[,11:195]
-
-# Import pathwayAPI
-PWAPI_FPATH <- "../info/pathwayAPI/pwapi_id_human-filtered_entrez.tsv"
-pwapi_df <- read.table(PWAPI_FPATH, header=T,
-                       sep="\t", stringsAsFactors = F)
-list_pwAPI <- split(pwapi_df[,2:3], pwapi_df$pathway)
-
-par(mfrow = c(3,5))
-for (df_pwapi in list_pwAPI) {
-  # Only retain edges where both nodes are in list of genes
-  fltr_df <- df_pwapi[df_pwapi$from %in% highexpr_genes_data1_control & df_pwapi$to %in% highexpr_genes_data1_control,]
-  if (nrow(fltr_df) >= 5) {
-    fltr_graph <- ftM2graphNEL(data.matrix(fltr_df))
-    print(fltr_graph)
-    plot(fltr_graph)
-    print(graph_from_edgelist(data.matrix(fltr_df)))
-    # fltr_list <- connComp(fltr_graph)
-    # subnetwork_list <- fltr_list[sapply(fltr_list, length) >= 5]
-    # print(subnetwork_list)
-  }
-}
-
-
-fltr_graph1 <- igraph.from.graphNEL(fltr_graph)
-connected_list <- decompose(fltr_graph1)
-for (graph in connected_list) {
-  connected_list[[1]]
-  get.edgelist(connected_list[[1]])  
-}
-
-subnetwork_list <- fltr_list[lapply(fltr_list, length) >= 5]
-
-plot(fltr_graph)
-subnetworks_pfs
-
-# Returns a list of connected components
-ls_components <- connComp(graph)
-component_nodes <- unlist(ls_components[which.max(sapply(ls_components, length))])
-largest_subgraph <- subGraph(component_nodes, graph)
-export_graph <- igraph.from.graphNEL(largest_subgraph, name = T, weight = F, unlist.attrs = F)
-output_fpath <- paste0("/home/dblux/projects/phd/cs6216/info/kegg_human-edgelist/",
-                       path_name, ".tsv")
-
-nodes_high <- paste0("hsa:", final_list[final_list %in% substring(hsa@nodes, 5)])
-
-# PLOT - Rgraphviz---------------------------------------------------------
+ # PLOT - Rgraphviz---------------------------------------------------------
 # Copy default Rgraphviz attributes
 graph_attr <- getDefaultAttrs()
 # Alter Rgraphviz attributes
