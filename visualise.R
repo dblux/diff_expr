@@ -21,89 +21,6 @@ theme_update(text = element_text(size=48),
 # Color palette
 custom_colour <- colorRampPalette(brewer.pal(11, "RdYlGn"))(50)
 
-head(mtcars)
-
-ggplot(mtcars, aes(x=wt, y=mpg)) +
-  geom_point()
-
-ggsave(filename = "~/Desktop/plot.eps", width = 10, height = 10)
-
-### FUNCTIONS ###
-# Used in GFS function. Bins score with range [0,1] into intervals
-# E.g. 4 Intervals: Binned into 0.2, 0.4, 0.6, 0.8
-bin <- function(score, num_intervals) {
-  for (i in 1:num_intervals) {
-    if (score <= i/num_intervals) {
-      return (i/(num_intervals+1))
-    }
-  }
-}
-
-# Gene Fuzzy Scoring function transforms gene expression values
-# Wilson Goh's paper
-# Dense rank is used
-GFS <- function(A, upper=0.05, lower=0.15, num_intervals=0) {
-  print(sprintf("Top %.2f of expressed genes are assigned GFS scores of 1", upper))
-  print(sprintf("Genes below the top %.2f of expressed genes are assigned GFS scores of 0", lower))
-  # Rank function ranks largest value as 1 [-A is used]
-  # Handle NaN?
-  ranked_A <- apply(-A, 2, dense_rank)
-  rownames(ranked_A) <- rownames(A)
-  # Returns [1,] = upper, [2,] = lower
-  qtile <- apply(ranked_A, 2, quantile, probs=c(upper, lower), names=F)
-  
-  if (num_intervals <= 0) {
-    for (c in 1:ncol(ranked_A)) {
-      # Calculate qtile range
-      q_range <- qtile[2,c] - qtile[1,c]
-      for (r in 1:nrow(ranked_A)) {
-        if (ranked_A[r,c] <= qtile[1,c]) {
-          # Assign 1s
-          ranked_A[r,c] <- 1
-        } else if (ranked_A[r,c] > qtile[2,c]){
-          # Assign 0s
-          ranked_A[r,c] <- 0
-        } else {
-          # Assign score
-          score <- (qtile[2,c] - ranked_A[r,c]) / q_range
-          ranked_A[r,c] <- score
-        }
-      }
-    }
-  } else {
-    # Discrete intervals
-    for (c in 1:ncol(ranked_A)) {
-      # Calculate qtile range
-      q_range <- qtile[2,c] - qtile[1,c]
-      for (r in 1:nrow(ranked_A)) {
-        if (ranked_A[r,c] <= qtile[1,c]) {
-          # Assign 1s
-          ranked_A[r,c] <- 1
-        } else if (ranked_A[r,c] > qtile[2,c]){
-          # Assign 0s
-          ranked_A[r,c] <- 0
-        } else {
-          # Assign score
-          score <- (qtile[2,c] - ranked_A[r,c]) / q_range
-          # Round off score
-          ranked_A[r,c] <- bin(score, num_intervals)
-        }
-      }
-    }
-  }
-  return (ranked_A)
-}
-
-# Quantile normalisation
-# Takes in array where columns are samples and rows are genes
-qnorm <- function(arr) {
-  sort_arr <- apply(arr,2,sort)
-  ref_distr <- apply(sort_arr,1,mean)
-  rank_arr <- apply(arr,2,dense_rank)
-  qnorm_arr <- apply(rank_arr,c(1,2), function(x) ref_distr[x])
-  return(qnorm_arr)
-}
-
 # Ovarian data set 1
 # Not log2
 ds1 <- read.table('data/ovarian_cancer/GSE18521/processed/processed_original.tsv', header = T, row.names = 1)
@@ -119,21 +36,13 @@ tumour_ds2 <- ds2[11:195]
 exp_control_ds2 <- 2^(control_ds2)
 exp_tumour_ds2 <- 2^(tumour_ds2)
 
-# Breast cancer data set
-# control <- read.table('data/yeoh_2002/processed/processed_normal.tsv', header = T, row.names = 1)
-# patient <- read.table('data/yeoh_2002/processed/processed_TEL-AML1.tsv', header = T, row.names = 1)
-
-colnames(control_ds2) <- paste0("N", 1:10)
-mcon_ds2 <- melt(control_ds2, variable.name = "ID")
-
 # Plot pdf to see whether it has been quantile normalised
 lcon_ds1 <- log2(control_ds1)
+
 colnames(lcon_ds1) <- paste0("N", 1:10)
 mtlgcon_ds1 <- melt(lcon_ds1, variable.name = "ID")
-
 colnames(control_ds1) <- paste0("N", 1:10)
 mtcon_ds1 <- melt(control_ds1, variable.name = "ID")
-head(mtcon_ds1)
 
 ggplot(mtcon_ds1, aes(x=value, color=ID)) + 
   geom_density()
@@ -146,10 +55,6 @@ control_mean <- apply(control_ds1, 1, mean)
 tumour_mean <- apply(tumour_ds1, 1, mean)
 fc <- tumour_mean/control_mean
 
-# Visulise heatmap
-arr1 <- data.matrix(control_ds1[fc > 2 | fc < 0.5,])
-heatmap(arr1)
-
 # Visualise rank stability within controls
 raw_sd <- apply(control_ds1, 1, sd)
 raw_mean <- apply(control_ds1, 1, mean)
@@ -158,7 +63,7 @@ raw_cv <- raw_sd/raw_mean
 # Mean coeff var plot
 plot(log2(raw_mean), log2(raw_cv))
 
-# Rank vlaues
+# Rank values
 control_rank <- apply(control_ds1, 2, rank)
 rank_sd <- apply(control_rank, 1, sd)
 rank_mean <- apply(control_rank, 1, mean)
@@ -172,31 +77,33 @@ qnraw_mean <- apply(qnctrl_ds1, 1, mean)
 qnraw_cv <- qnraw_sd/qnraw_mean
 
 # Manipulate for ggplot
-df <- cbind.data.frame(c(raw_cv, qnraw_cv, rank_cv), rep(c("Raw values", "Quantile normalised", "Rank values"), each=11774))
+df <- cbind.data.frame(c(raw_cv, qnraw_cv, rank_cv),
+                       rep(c("Raw values", "Quantile normalised", "Rank values"), each=11774))
 colnames(df) <- c("value","ID")
 
 reorder(df$ID, rep(c(1,2,3), each=11774), order = T)
 
-# Boxplot
-boxplot(cbind(raw_cv,rank_cv, qnraw_cv), outline=F)
 
+# Density plot ------------------------------------------------------------
 qnctrl1 <- melt(qnctrl_ds1)[,2:3]
 lgqnctrl1 <- melt(log2(qnctrl_ds1))[,2:3]
 
 ggplot(lgqnctrl1, aes(x=value, color=Var2)) + 
   geom_density()
 
-# Violin plot
+# Boxplot -----------------------------------------------------------------
+boxplot(cbind(raw_cv,rank_cv, qnraw_cv), outline=F)
+
+# Violin plot -------------------------------------------------------------
 ggplot(df, aes(reorder(df$ID, rep(c(1,2,3), each=11774), order = T), y=value)) + 
   geom_violin(aes(fill=reorder(df$ID, rep(c(1,2,3), each=11774), order = T))) +
   labs(y = "Coefficient of variation") +
   theme(legend.position="none",
         axis.title.x=element_blank())
-        # axis.text.x=element_blank(),
-        # axis.ticks.x=element_blank())
+# axis.text.x=element_blank(),
+# axis.ticks.x=element_blank())
 
 ggsave("stability.eps", width = 20, height = 20, units = "cm")
-
 
 ggplot(df, aes(reorder(df$ID, rep(c(1,2,3), each=11774), order = T), y=value)) + 
   geom_violin(aes(fill=reorder(df$ID, rep(c(1,2,3), each=11774), order = T))) +
@@ -215,45 +122,20 @@ ggplot(mtcars, aes(factor(cyl), mpg)) +
   theme(legend.position="none",
         axis.title.x=element_blank())
 
-# Manipulate for base plot
-par(mfrow=c(1,1))
-boxplot(cpare)
+# 2D Scatterplot ----------------------------------------------------------
+# R base plot
+plot(sum_chips, col = rep(1:6, each = 5), pch = 19)
+# text(sum_chips, labels,
+#      cex = 0.6, srt = 0, adj = c(0,-10))
 
-control_var <- apply(control_ds1, 1, var)
-control_var <- apply(control_ds1, 1, var)
+# ggplot2
+head(mtcars)
 
-# Visualise whether low expression genes have high coeff var
-plot(raw_mean, raw_cv)
+ggplot(mtcars, aes(x=wt, y=mpg)) +
+  geom_point()
 
-n <- rnorm(1000,0,1)
-p <- rnorm(1000,1,1)
-
-p1 <- sapply(n, function(x) x-p[1])
-p2 <- sapply(n, function(x) x-p[2])
-p3 <- sapply(n, function(x) x-p[3])
-p4 <- sapply(n, function(x) x-p[4])
-p5 <- sapply(n, function(x) x-p[5])
-p6 <- sapply(n, function(x) x-p[6])
-p7 <- sapply(n, function(x) x-p[7])
-p8 <- sapply(n, function(x) x-p[8])
-p9 <- sapply(n, function(x) x-p[9])
-p10 <- sapply(n, function(x) x-p[10])
-
-plot(density(c(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10)))
-par(new=T)
-curve(dnorm(x,-0.65,0.5), xlim=c(-3,3))
-
-
-# PCA ---------------------------------------------------------------------
-pc_cars <- prcomp(mtcars[,3:6], center = T, scale. = T)
-pc_cars_p <- prcomp(mtcars[,3:6], center = T, scale. = F)
-pc_cars$x[,1]
-
-par(mfrow = c(1,2))
-plot(pc_cars$x[,1], pc_cars$x[,2])
-plot(pc_cars_p$x[,1], pc_cars_p$x[,2])
-
-# 3D ----------------------------------------------------------------------
+ggsave(filename = "~/Desktop/plot.eps", width = 10, height = 10)
+# 3D Scatterplot ----------------------------------------------------------
 x <- 1:20
 y <- 1:20
 
@@ -285,8 +167,16 @@ rgl.open()
 rgl.bg(color="white")
 plot3d(x,y,z)
 
+# PCA ---------------------------------------------------------------------
+pc_cars <- prcomp(mtcars[,3:6], center = T, scale. = T)
+pc_cars_p <- prcomp(mtcars[,3:6], center = T, scale. = F)
+pc_cars$x[,1]
 
-# CLUSTERING -------------------------------------------------
+par(mfrow = c(1,2))
+plot(pc_cars$x[,1], pc_cars$x[,2])
+plot(pc_cars_p$x[,1], pc_cars_p$x[,2])
+
+# Clustering -------------------------------------------------
 # Import ovarian cancer data set 1
 # Not log2
 ovarian_data1 <- read.table("data/ovarian_cancer/GSE18521/processed/GSE18521_entrez.tsv",
@@ -382,3 +272,30 @@ heatmap.2(data.matrix(fltr_data1),
           labCol = c(paste0("N",1:10), paste0("P",1:52)),
           scale = "row")
 dev.off()
+
+# Multiple plots ----------------------------------------------------------
+# Mix of base plots and ggplots
+# Settings for base plot
+par(xpd = NA, # switch off clipping, necessary to always see axis labels
+    bg = "transparent", # switch off background to avoid obscuring adjacent plots
+    mar = c(6,2,2,2))
+# Total probe intensities for each chip
+sum_chips <- apply(df, 2, sum)
+plot(sum_chips,
+     col = rep(1:6, each = 5), pch = 19)
+# text(sum_chips, labels,
+#      cex = 0.6, srt = 0, adj = c(0,-10))
+sum_plot <- recordPlot()
+# Boxplots of chips
+boxplot(df, las = 2)
+boxplot <- recordPlot()
+# Plot density curves
+pdf <- plot_pdf(df)
+# Plot multiple plots
+multiplot <- plot_grid(boxplot, sum_plot, pdf,
+                       nrow = 3)
+save_plot("dump/before.eps", before_norm,
+          base_height = 10, base_width = 8)
+
+# SAVE --------------------------------------------------------------------
+save_eps(boxplot(df), "dump/test.eps")

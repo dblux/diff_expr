@@ -64,17 +64,20 @@ GFS <- function(A, upper=0.05, lower=0.15, num_intervals=0) {
       }
     }
   }
-  return (ranked_A)
+  return (as.data.frame(ranked_A))
 }
 
 # Quantile normalisation
-# Takes in array where columns are samples and rows are genes
-qnorm <- function(arr) {
-  sort_arr <- apply(arr,2,sort)
-  ref_distr <- apply(sort_arr,1,mean)
-  rank_arr <- apply(arr,2,dense_rank)
-  qnorm_arr <- apply(rank_arr,c(1,2), function(x) ref_distr[x])
-  return(qnorm_arr)
+# Takes in df where columns are samples and rows are genes
+norm_quantile <- function(df) {
+  sort_arr <- apply(df, 2, sort)
+  # Creates reference distribution
+  ref_distr <- apply(sort_arr, 1, mean)
+  rank_arr <- apply(df, 2, rank, ties.method = "random")
+  qnorm_arr <- apply(rank_arr, c(1,2), function(x) ref_distr[x])
+  rownames(qnorm_arr) <- rownames(df)
+  qnorm_df <- as.data.frame(qnorm_arr)
+  return(qnorm_df)
 }
 
 # Function that calculates the matrix of mean differences from the patient and control matrix
@@ -162,4 +165,54 @@ row_ttest <- function (a,b) {
     try(tt_pvalue[i] <- t.test(a[i,], b[i,])$p.value, silent = T)
   }
   return (tt_pvalue)
+}
+
+# Save figure as EPS
+save_eps <- function(plot, fpath, fig_width = 10, fig_height = 6) {
+  setEPS()
+  postscript(fpath, width = fig_width, height = fig_height)
+  # Plot function call
+  plot
+  dev.off()
+}
+
+# Arguments: Dataframe, probeset annotation filepath
+# Maps affy probesets to entrez ID
+# Removes ambiguous probesets and probesets with no ID
+# Selects maximum if two probesets match to same gene
+affy2entrez <- function(df, annot_fpath) {
+  probeset_annot <- read.table(annot_fpath,
+                               sep="\t", header=T, row.names=1,
+                               stringsAsFactors=F, strip.white = T)
+  # Filters out ambiguous and AFFY probesets from annot
+  fltr_annot <- probeset_annot[grepl("[0-9]_at", rownames(probeset_annot))
+                               & !startsWith(rownames(probeset_annot), "A"), , drop=F]
+  # Returns entrez ID for all probe sets
+  entrez <- unname(sapply(rownames(df), function(x) probeset_annot[x,]))
+  # # First entrez ID selected for ambiguous probe sets
+  # correction <- sub(" ///.*$", "", entrez[grepl("///", entrez)])
+  # # Entrez ID to be substituted
+  # entrez[grepl("///", entrez)] <- correction
+  
+  # Indices of ambiguous probe sets and probe sets with no corresponding entrez ID to be deleted
+  list_del <- which(grepl("///", entrez) | entrez == "")
+  # Identifies genes that have multiple probesets mapping to it
+  freq_gene <- table(entrez)
+  dup_genes <- names(freq_gene[freq_gene > 1])
+  for (i in dup_genes) {
+    # Rows of dataframe with the same entrez ID
+    same_rows <- df[entrez == i,]
+    # Assign indices as rownames
+    rownames(same_rows) <- which(entrez == i)
+    # Rows that do not have the maximum sum are deleted
+    row_del <- as.integer(rownames(same_rows[-which.max(apply(same_rows,1,sum)),]))
+    # Concat with existing list of indices to be deleted
+    list_del <- c(list_del, row_del)
+  }
+  # Rows are deleted
+  df_genes <- df[-list_del,]
+  fltr_entrez <- entrez[-list_del]
+  # Assigning entrez ID to df
+  rownames(df_genes) <- fltr_entrez
+  return(df_genes)
 }
