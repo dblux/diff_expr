@@ -167,6 +167,15 @@ row_ttest <- function (a,b) {
   return (tt_pvalue)
 }
 
+# Arguments: 2 dataframes that are not log-transformed
+# Log-fold change
+log_fc <- function(df1, df2) {
+  mean_vec1 <- apply(df1, 1, mean)
+  mean_vec2 <- apply(df2, 1, mean)
+  fc <- mean_vec1/mean_vec2
+  return(log2(fc))
+}
+
 # Save figure as EPS
 save_eps <- function(plot, fpath, fig_width = 10, fig_height = 6) {
   setEPS()
@@ -196,6 +205,8 @@ affy2entrez <- function(df, annot_fpath) {
   
   # Indices of ambiguous probe sets and probe sets with no corresponding entrez ID to be deleted
   list_del <- which(grepl("///", entrez) | entrez == "")
+  print(paste0("No. of probesets mapping to multiple IDs removed: ", sum(grepl("///", entrez))))
+  print(paste0("No. of probesets with no ID removed: ", sum(entrez == "")))
   # Identifies genes that have multiple probesets mapping to it
   freq_gene <- table(entrez)
   dup_genes <- names(freq_gene[freq_gene > 1])
@@ -214,5 +225,9 @@ affy2entrez <- function(df, annot_fpath) {
   fltr_entrez <- entrez[-list_del]
   # Assigning entrez ID to df
   rownames(df_genes) <- fltr_entrez
+  # # CONCEPT CHECK: Deleted rows
+  # df_genes_del <- df[list_del,]
+  # entrez_del <- entrez[list_del]
+  print(paste0("Total no. of probesets removed: ", length(list_del)))
   return(df_genes)
 }
