@@ -176,13 +176,21 @@ log_fc <- function(df1, df2) {
   return(log2(fc))
 }
 
-# Save figure as EPS
-save_eps <- function(plot, fpath, fig_width = 10, fig_height = 6) {
-  setEPS()
-  postscript(fpath, width = fig_width, height = fig_height)
-  # Plot function call
-  plot
-  dev.off()
+# Argument: Recorded plot
+# Save figure as file format indicated
+save_fig <- function(recorded_plot, fpath, fig_width = 10, fig_height = 6) {
+  if (endsWith(fpath, ".eps")) {
+    setEPS()
+    postscript(fpath, width = fig_width, height = fig_height)
+    replayPlot(recorded_plot)
+    dev.off()
+  } else if (endsWith(fpath, ".png")) {
+    png(fpath, width = fig_width, height = fig_height)
+    replayPlot(recorded_plot)
+    dev.off()
+  } else {
+    stop("File extension not supported...")
+  }
 }
 
 # Arguments: Dataframe, probeset annotation filepath
