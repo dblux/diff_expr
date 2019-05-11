@@ -178,7 +178,7 @@ log_fc <- function(df1, df2) {
 
 # Argument: Recorded plot
 # Save figure as file format indicated
-save_fig <- function(recorded_plot, fpath, fig_width = 10, fig_height = 6) {
+save_fig <- function(recorded_plot, fpath, fig_width = 8, fig_height = 5) {
   if (endsWith(fpath, ".eps")) {
     setEPS()
     postscript(fpath, width = fig_width, height = fig_height)
@@ -194,35 +194,32 @@ save_fig <- function(recorded_plot, fpath, fig_width = 10, fig_height = 6) {
 }
 
 # Arguments: Dataframe, probeset annotation filepath
-# Maps affy probesets to entrez ID
+# Maps affy probesets to ID
 # Removes ambiguous probesets and probesets with no ID
 # Selects maximum if two probesets match to same gene
-affy2entrez <- function(df, annot_fpath) {
+affy2id <- function(df, annot_fpath) {
   probeset_annot <- read.table(annot_fpath,
                                sep="\t", header=T, row.names=1,
                                stringsAsFactors=F, strip.white = T)
   # Filters out ambiguous and AFFY probesets from annot
   fltr_annot <- probeset_annot[grepl("[0-9]_at", rownames(probeset_annot))
                                & !startsWith(rownames(probeset_annot), "A"), , drop=F]
+  print(head(fltr_annot, 15))
   # Returns entrez ID for all probe sets
-  entrez <- unname(sapply(rownames(df), function(x) probeset_annot[x,]))
-  # # First entrez ID selected for ambiguous probe sets
-  # correction <- sub(" ///.*$", "", entrez[grepl("///", entrez)])
-  # # Entrez ID to be substituted
-  # entrez[grepl("///", entrez)] <- correction
-  
+  id <- unname(sapply(rownames(df), function(x) probeset_annot[x,]))
+
   # Indices of ambiguous probe sets and probe sets with no corresponding entrez ID to be deleted
-  list_del <- which(grepl("///", entrez) | entrez == "")
-  print(paste0("No. of probesets mapping to multiple IDs removed: ", sum(grepl("///", entrez))))
-  print(paste0("No. of probesets with no ID removed: ", sum(entrez == "")))
+  list_del <- which(grepl("///", id) | id == "")
+  print(paste0("No. of probesets mapping to multiple IDs removed: ", sum(grepl("///", id))))
+  print(paste0("No. of probesets with no ID removed: ", sum(id == "")))
   # Identifies genes that have multiple probesets mapping to it
-  freq_gene <- table(entrez)
+  freq_gene <- table(id)
   dup_genes <- names(freq_gene[freq_gene > 1])
   for (i in dup_genes) {
     # Rows of dataframe with the same entrez ID
-    same_rows <- df[entrez == i,]
+    same_rows <- df[id == i,]
     # Assign indices as rownames
-    rownames(same_rows) <- which(entrez == i)
+    rownames(same_rows) <- which(id == i)
     # Rows that do not have the maximum sum are deleted
     row_del <- as.integer(rownames(same_rows[-which.max(apply(same_rows,1,sum)),]))
     # Concat with existing list of indices to be deleted
@@ -230,12 +227,13 @@ affy2entrez <- function(df, annot_fpath) {
   }
   # Rows are deleted
   df_genes <- df[-list_del,]
-  fltr_entrez <- entrez[-list_del]
+  fltr_id <- id[-list_del]
   # Assigning entrez ID to df
-  rownames(df_genes) <- fltr_entrez
+  rownames(df_genes) <- fltr_id
   # # CONCEPT CHECK: Deleted rows
   # df_genes_del <- df[list_del,]
   # entrez_del <- entrez[list_del]
-  print(paste0("Total no. of probesets removed: ", length(list_del)))
+  print(paste0("Total no. of probesets removed (incl. probesets mapping to same gene): ",
+               length(list_del)))
   return(df_genes)
 }

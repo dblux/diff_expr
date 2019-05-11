@@ -1,7 +1,8 @@
 library(VennDiagram)
 library(cowplot)
-library(gridGraphics)
-library(grid)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
 source("functions.R")
 setwd("~/projects/phd/diff_expr/")
 
@@ -29,6 +30,9 @@ a3 <- exp_classA[,1:15]
 a4 <- exp_classA[,16:30]
 a5 <- exp_classA[,1:5]
 a6 <- exp_classA[,6:10]
+# 5 batches providing 1 technical replicate each
+a7 <- a1[,endsWith(colnames(a1), "_A1")][,1:5]
+colnames(a7)
 
 raw_classB <- read.table('data/MAQC-I/processed/classB_entrez.tsv',
                          header = T, row.names = 1)
@@ -41,6 +45,43 @@ b4 <- exp_classB[,16:30]
 b5 <- exp_classB[,1:5]
 b6 <- exp_classB[,6:10]
 
+raw_data <- cbind(raw_classA, raw_classB)
+eval_plot <- plot_evaluation(raw_data)
+save_plot("dump/raw_data.eps", eval_plot,
+          base_height = 12, base_width = 8)
+
+plot_evaluation <- function(df) {
+  # Melt dataframe
+  melt_df <- melt(df, variable.name = "ID")
+  # Plot boxplot
+  boxplot <- ggplot(melt_df, aes(x = ID, y = value, col = ID)) + 
+    geom_boxplot(show.legend = F) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  # Plot density curve
+  pdf <- ggplot(melt_df, aes(x = value, col = ID)) + 
+    geom_density(show.legend = T)
+  # Total probe intensities for each chip
+  mean_tibble <- melt_df %>% group_by(ID) %>%
+    summarise(mean = mean(value))
+  # Scatter plot
+  scatter <- ggplot(mean_tibble, aes(x = ID, y = mean, col = factor(rep(1:12, each = 5)))) +
+    geom_point(show.legend = F) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  # Principal component analysis
+  pca_obj <- prcomp(t(df), center = T, scale. = T)
+  top_pc <- as.data.frame(pca_obj$x[,1:4])
+  pc1_pc2 <- ggplot(top_pc, aes(x = PC1, y = PC2, col = factor(rep(1:12, each = 5)))) +
+    geom_point(size = 3, show.legend = F)
+  pc3_pc4 <- ggplot(top_pc, aes(x = PC3, y = PC4, col = factor(rep(1:12, each = 5)))) +
+    geom_point(size = 3, show.legend = F)
+  # Plot all graphs
+  pca <- plot_grid(pc1_pc2, pc3_pc4)
+  multiplot <- plot_grid(scatter, boxplot, pdf, pca,
+                         nrow = 4)
+  return(multiplot)  
+}
+
+# FPR ---------------------------------------------------------------------
 # T-test
 fpr_ttest <- function(df1, df2) {
   pvalue_ttest <- row_ttest(df1, df2)
@@ -225,3 +266,60 @@ abline(v = c(-1,1))
 DE_single_volcano <- recordPlot()
 save_fig(DE_single_volcano, "dump/DE_singlebatch-volcano.eps",
          fig_height = 10)
+
+# MA plot -----------------------------------------------------------------
+# Evaluate whether log fold change mainly identifies low expression changes
+a_list <- list(a3, a4, a5)
+# List of mean vectors
+a_mean <- lapply(a_list, apply, 1, mean)
+
+b_list <- list(b3, b4, b5)
+# List of mean vectors
+b_mean <- lapply(b_list, apply, 1, mean)
+
+# MA-plot average
+maplot_avg <- function(vec1, vec2) {
+  return(0.5 * (log2(vec1) + log2(vec2)))
+}
+
+par(mfrow=c(2,2))
+# Returns dataframe of 3 cbind vectors
+avg_df <- mapply(maplot_avg, a_mean, b_mean)
+plot(logfc5 ~ avg_df[,1],
+     col = 1 + (abs(logfc5) >= 1))
+
+plot(logfc9 ~ avg_df[,3],
+     col = 1 + (abs(logfc9) >= 1))
+
+# Plot density curve of logfc identified DE genes avg values
+plot(density(avg_df[,1][abs(logfc5) >= 1]))
+plot(density(avg_df[,3][abs(logfc9) >= 1]))
+
+MA_density <- recordPlot()
+save_fig(MA_density, "dump/MA_density.eps", fig_height = 8)
+
+# Rank stability (within vs between batches) ------------------------------
+rank_stability <- function(df, plot_label) {
+  ranked_df <- apply(df, 2, rank)
+  rank_sd <- apply(ranked_df, 1, sd)
+  rank_mean <- apply(ranked_df, 1, mean)
+  # Rank coefficient of variation
+  rank_cv <- rank_sd/rank_mean
+  plot(rank_mean, rank_sd,
+       main = plot_label)
+  # Plot 3D density plot
+  # Range of ranks
+  rank_max <- apply(ranked_df, 1, max)
+  rank_min <- apply(ranked_df, 1, min)
+  rank_range <- rank_max - rank_min
+  # plot(rank_mean, rank_range)
+}
+
+# Highly ranked genes exhibit smaller cv
+# With batch effects: More CV among ranks
+par(mfrow = c(1,2))
+rank_stability(a5, "Within batch")
+rank_stability(a7, "Across 5 batches")
+mean_cv <- recordPlot()
+save_fig(mean_cv, "dump/mean_cv-batch_effects.eps",
+         fig_width = 12, fig_height = 6)
