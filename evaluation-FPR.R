@@ -321,5 +321,5 @@ par(mfrow = c(1,2))
 rank_stability(a5, "Within batch")
 rank_stability(a7, "Across 5 batches")
 mean_cv <- recordPlot()
-save_fig(mean_cv, "dump/mean_cv-batch_effects.eps",
-         fig_width = 12, fig_height = 6)
+save_fig(mean_cv, "dump/mean_sd-batch_effects.eps",
+         fig_width = 9, fig_height = 4.5)

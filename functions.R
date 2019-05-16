@@ -159,21 +159,21 @@ ttest_onesample <- function (vector, mu) {
 # Naive row-wise two-sample t-test for every probe
 # Does a t-test between every row of matrices a and b
 # Returns a vector of p-values (length: nrow(a))
-row_ttest <- function (a,b) {
-  tt_pvalue <- numeric(nrow(a))
-  for (i in 1:nrow(a)) {
-    try(tt_pvalue[i] <- t.test(a[i,], b[i,])$p.value, silent = T)
+row_ttest <- function (df1, df2) {
+  tt_pvalue <- numeric(nrow(df1))
+  names(tt_pvalue) <- rownames(df1)
+  for (i in 1:nrow(df1)) {
+    try(tt_pvalue[i] <- t.test(df1[i,], df2[i,])$p.value, silent = T)
   }
   return (tt_pvalue)
 }
 
 # Arguments: 2 dataframes that are not log-transformed
-# Log-fold change
+# Log-fold change (class1/class2)
 log_fc <- function(df1, df2) {
   mean_vec1 <- apply(df1, 1, mean)
   mean_vec2 <- apply(df2, 1, mean)
-  fc <- mean_vec1/mean_vec2
-  return(log2(fc))
+  return(log2(mean_vec1/mean_vec2))
 }
 
 # Argument: Recorded plot
@@ -204,7 +204,6 @@ affy2id <- function(df, annot_fpath) {
   # Filters out ambiguous and AFFY probesets from annot
   fltr_annot <- probeset_annot[grepl("[0-9]_at", rownames(probeset_annot))
                                & !startsWith(rownames(probeset_annot), "A"), , drop=F]
-  print(head(fltr_annot, 15))
   # Returns entrez ID for all probe sets
   id <- unname(sapply(rownames(df), function(x) probeset_annot[x,]))
 
@@ -236,4 +235,28 @@ affy2id <- function(df, annot_fpath) {
   print(paste0("Total no. of probesets removed (incl. probesets mapping to same gene): ",
                length(list_del)))
   return(df_genes)
+}
+
+# Evaluates DE analysis method
+# Arguments: 2 logical vectors - predicted and truth labels
+# Returns: Accuracy, Sensitivity, Precision, Specificity, NPR
+evaluation_report <- function(predict_vec, label_vec) {
+  accuracy <- sum(predict_vec == label_vec)/length(predict_vec)
+  TP <- sum(predict_vec & label_vec)
+  TN <- sum(!predict_vec & !label_vec)
+  sensitivity_1 <- TP/sum(label_vec)
+  precision_1 <- TP/sum(predict_vec)
+  specificity_1 <- TN/sum(!label_vec)
+  negative_predictive_rate_1 <- TN/sum(!predict_vec)
+  Sensitivity <- c(sensitivity_1, specificity_1)
+  Precision <- c(precision_1, negative_predictive_rate_1)
+  df <- cbind(Sensitivity, Precision)
+  rownames(df) <- c("DE", "Not DE")
+  print(df)
+  print(paste("Accuracy:", accuracy))
+  metrics <- c(accuracy, sensitivity_1, precision_1,
+               specificity_1, negative_predictive_rate_1)
+  names(metrics) <- c("Accuracy", "Sensitivity", "Precision",
+                      "Specificity", "NPR")
+  return(metrics)
 }

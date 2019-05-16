@@ -136,36 +136,26 @@ ggplot(mtcars, aes(x=wt, y=mpg)) +
 
 ggsave(filename = "~/Desktop/plot.eps", width = 10, height = 10)
 # 3D Scatterplot ----------------------------------------------------------
-x <- 1:20
-y <- 1:20
-
-f <- function(x,y) {
-  return (2*x + 3*y)
-}
-
-z <- outer(x,y,f)
-
-# 3D surface plot using persp
-plt <- persp(x,y,z, ticktype = "detailed", xlim=c(-5,5))
-
-# Adding points and lines to persp
-trans3d <- function(x,y,z, pmat) {
-  tr <- cbind(x,y,z,1) %*% pmat
-  list(x = tr[,1]/tr[,4], y= tr[,2]/tr[,4])
-}
-
-coord <- trans3d(1,1,f(1,1), plt)
-points(trans3d(1,1,f(1,1), plt))
-
-z2 <- sapply(1:length(x),function(n)f(x[n],y[n]))
-lines(trans3d(x,y,z2,plt),col="red",lwd=2)
-lines(trans3d(c(-10,10,10,-10,-10),c(-10,-10,10,10,-10),c(2,2,8,8,2), pmat), col="blue")
-
-# Plot 3D scatter
 library(rgl)
 rgl.open()
 rgl.bg(color="white")
 plot3d(x,y,z)
+
+persp3d(volcano)
+rgl.postscript("dump/volcano.eps")
+
+f <- function(x, y) {
+  z = ((x^2)+(3*y^2)) * exp(-(x^2)-(y^2))
+}
+
+# Plot a 3D function surface plot
+plot3d(f,
+       xlim = c(-3, 3), ylim = c(-3, 3),)
+
+# Plot a 3D density plot
+# Use MASS package to calculate densities
+plot_3d <- MASS::kde2d(A,M)
+persp3d(plot_3d)
 
 # PCA ---------------------------------------------------------------------
 pc_cars <- prcomp(mtcars[,3:6], center = T, scale. = T)
