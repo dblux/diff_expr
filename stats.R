@@ -93,3 +93,9 @@ curve(dnorm(x, 0, sqrt(1/n)), xlim=c(-2,2))
 mean(sample_mean)
 var(sample_mean)
 1/n
+
+x <- rnorm(10000)
+A <- exp(x)
+plot(density(log(A)),
+     xlim = c(0,5))
+

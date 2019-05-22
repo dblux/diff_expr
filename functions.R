@@ -140,7 +140,7 @@ all_diff <- function(a, b) {
 # Calculate one-sample t-test statistic
 # Using sample sd as estimator of population sd
 # Use t-distribution to calculate p value
-ttest_onesample <- function (vector, mu) {
+ttest_onesample <- function(vector, mu) {
   n <- length(vector)
   t_stat <- (mean(vector) - mu) / (sd(vector)/sqrt(n))
   if (is.infinite(t_stat)|is.na(t_stat)) {
@@ -159,21 +159,28 @@ ttest_onesample <- function (vector, mu) {
 # Naive row-wise two-sample t-test for every probe
 # Does a t-test between every row of matrices a and b
 # Returns a vector of p-values (length: nrow(a))
-row_ttest <- function (df1, df2) {
+row_ttest <- function(df1, df2) {
   tt_pvalue <- numeric(nrow(df1))
   names(tt_pvalue) <- rownames(df1)
   for (i in 1:nrow(df1)) {
     try(tt_pvalue[i] <- t.test(df1[i,], df2[i,])$p.value, silent = T)
   }
-  return (tt_pvalue)
+  return(tt_pvalue)
 }
 
 # Arguments: 2 dataframes that are not log-transformed
 # Log-fold change (class1/class2)
-log_fc <- function(df1, df2) {
-  mean_vec1 <- apply(df1, 1, mean)
-  mean_vec2 <- apply(df2, 1, mean)
-  return(log2(mean_vec1/mean_vec2))
+calc_logfc <- function(df1, df2, prior_value = 0.1, func = mean) {
+  vec1 <- apply(df1, 1, func)
+  vec2 <- apply(df2, 1, func)
+  # log2(0) = -Inf; log2(Inf) = -Inf; log2(0/0) = NaN
+  # Reassigns 0s with prior_expr
+  vec1[vec1 == 0] <- prior_value
+  vec2[vec2 == 0] <- prior_value
+  fc <- vec1/vec2
+  # Reassigns NaN (0/0) with 1
+  fc[is.nan(fc)] <- 1
+  return(log2(fc))
 }
 
 # Argument: Recorded plot
@@ -259,4 +266,12 @@ evaluation_report <- function(predict_vec, label_vec) {
   names(metrics) <- c("Accuracy", "Sensitivity", "Precision",
                       "Specificity", "NPR")
   return(metrics)
+}
+
+# Log2 transforms data and handles -Inf values
+log2_transform <- function(df) {
+  log2_df <- log2(df)
+  logical_df <- is.infinite(data.matrix(log2_df))
+  log2_df[logical_df] <- 0
+  return(log2_df)
 }

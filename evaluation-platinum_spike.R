@@ -1,24 +1,38 @@
 library(ggplot2)
-library(rgl)
-library(RColorBrewer)
+library(cowplot)
+library(reshape2)
+# library(rgl)
 setwd("~/projects/phd/diff_expr/")
 source("functions.R")
 
 # Import normalised platinum spike dataset
-qnorm_data <- read.table("data/platinum_spike/GSE21344/processed/qnorm_fltr_full.tsv",
+DATA_RPATH <- "data/platinum_spike/GSE21344/processed/qnorm_mas5.tsv"
+qnorm_data <- read.table(DATA_RPATH,
                          header = T, row.names = 1, stringsAsFactors = F)
+classA <- qnorm_data[, 1:9]
+classB <- qnorm_data[, 10:18]
+
 exp_data <- 2^qnorm_data
 classA <- exp_data[, 1:9]
 classB <- exp_data[, 10:18]
 
+# Dataset with relaxed P call threshold
+DATA_RPATH1 <- "data/platinum_spike/GSE21344/processed/qnorm_mas5_010.tsv"
+qnorm_data1 <- read.table(DATA_RPATH1,
+                          header = T, row.names = 1, stringsAsFactors = F)
+classA1 <- qnorm_data1[, 1:9]
+classB1 <- qnorm_data1[, 10:18]
+
+LABEL_RPATH <- "data/platinum_spike/GSE21344/processed/ordered_foldchange_full.tsv"
 # Import platinum spike labels
-probeset_foldchange <- read.table("data/platinum_spike/GSE21344/processed/ordered_foldchange_full.tsv",
-                                   header = F, row.names = 1, stringsAsFactors = F)
-# ordered_foldchange <- probeset_foldchange[order(rownames(probeset_foldchange)), , drop = F]
+probeset_foldchange <- read.table(LABEL_RPATH,
+                                  header = F, row.names = 1, stringsAsFactors = F)
+# ordered_foldchange <- probeset_foldchange[order(rownames(probeset_foldchange)), , drop =][]][] F]
 # write.table(ordered_foldchange, "data/platinum_spike/GSE21344/processed/ordered_foldchange_full.tsv",
 #             sep = "\t", col.names = F, quote = F)
 
 vec_foldchange <- probeset_foldchange[, 1]
+
 names(vec_foldchange) <- rownames(probeset_foldchange)
 # Creates binary labels with TRUE being differentially expressed
 binary_label <- vec_foldchange != 1 & vec_foldchange != 0
@@ -77,11 +91,20 @@ plot_roc <- function(score_list, label_vec,
 # T-test
 pvalue_ttest <- row_ttest(classA, classB)
 predict_ttest <- pvalue_ttest <= 0.05
+# Converts NA labels to F labels
+predict_ttest[is.na(predict_ttest)] <- F
+sum(predict_ttest)
 
 # LogFC
-foldchange_logfc <- log_fc(classA, classB)
-abs_fc <- abs(foldchange_logfc)
-predict_logfc <- abs_fc >= 1
+# Depends on whether mean or median is used
+foldchange_median <- calc_logfc(classA, classB, func = median)
+abs_fc <- abs(foldchange_median)
+# sum(is.infinite(abs_fc))
+predict_logfc <- abs_fc >= log2(1.2)
+# Converts NA to F labels
+sum(predict_logfc)
+
+plot(foldchange_median, -log10(pvalue_ttest))
 
 # Evaluation
 score_list <- list(pvalue_ttest, abs_fc)
@@ -90,37 +113,20 @@ roc_auc <- plot_roc(score_list, binary_label,
 plot_roc <- recordPlot()
 save_fig(plot_roc, "dump/platinum-roc.eps", fig_height = 8)
 
-
 eval_ttest <- evaluation_report(predict_ttest, binary_label)
 eval_logfc <- evaluation_report(predict_logfc, binary_label)
-eval_ttest
-sum(predict_ttest)
-sum(predict_logfc)
-sum(binary_label)
+
 abline(h = 0.87, v = 0.62)
 
 # Robust statistics -------------------------------------------------------
-log_fc <- function(df1, df2) {
-  mean_vec1 <- apply(df1, 1, mean)
-  mean_vec2 <- apply(df2, 1, mean)
-  fc <- mean_vec1/mean_vec2
-  return(log2(fc))
-}
-
-log_fc_median <- function(df1, df2) {
-  mean_vec1 <- apply(df1, 1, median)
-  mean_vec2 <- apply(df2, 1, median)
-  fc <- mean_vec1/mean_vec2
-  return(log2(fc))
-}
-
-logfc_median <- log_fc_median(classA, classB)
+foldchange_mean <- calc_logfc(classA, classB, func = mean)
+foldchange_median <- calc_logfc(classA, classB, func = median)
 
 # Plot scatterplot
 par(mfrow = c(2,1))
-plot(log2(vec_foldchange), foldchange_logfc)
+plot(log2(vec_foldchange), foldchange_mean)
 abline(a = 0, b = 1)
-plot(log2(vec_foldchange), logfc_median)
+plot(log2(vec_foldchange), foldchange_median)
 abline(a = 0, b = 1)
 
 # Plot violin plot
@@ -157,10 +163,73 @@ plot(A, M, col = 1 + no_spikein)
 
 plot_df <- data.frame(A, M)
 plot_nospike <- ggplot(plot_df[no_spikein,], aes(x = A, y = M)) +
-                  geom_point() + stat_density2d()
-  # + geom_vline(xintercept = 3.5)
-ggsave("dump/no_spike-scatter.eps", plot_nospike)
+                  geom_point(pch = 1) + stat_density2d() + 
+                  geom_vline(xintercept = 3.5)
 
+plot_spike <- ggplot(plot_df[!no_spikein,], aes(x = A, y = M)) +
+  geom_point(pch = 1)
+
+ggsave("dump/spike-scatter.eps", plot_spike)
+
+# Background noise --------------------------------------------------------
+plot_density <- function(df) {
+  # Melt dataframe
+  melt_df <- melt(df, variable.name = "ID")
+  # Plot density curve
+  density_plot <- ggplot(melt_df, aes(x = value, col = ID)) + 
+    geom_density(show.legend = F)
+  return(density_plot)
+}
+
+no_spikein <- vec_foldchange == 0
+
+plot_spike_nospike <- function(df) {
+  # Log transform data
+  log_df <- log2_transform(df)
+  nospike_df <- log_df[no_spikein,]
+  spike_df <- log_df[!no_spikein,]
+  density_nospike <- plot_density(nospike_df) + xlim(0, 7)
+  density_spike <- plot_density(spike_df) + xlim(0, 16)
+  density_compare <- plot_grid(density_nospike, density_spike)
+  return(density_compare)
+}
+
+mas5_010 <- plot_spike_nospike(qnorm_data1)
+mas5_010
+save_plot("dump/mas5_010.eps", mas5_010, base_width = 10)
+
+log_df <- log2_transform(qnorm_data)
+nospike_df <- log_df[no_spikein,]
+spike_df <- log_df[!no_spikein,]
+
+length(nospike_df[,1])
+sum(nospike_df[,1] != 0)
+
+length(spike_df[,1])
+sum(spike_df[,1] == 0)
+hist(nospike_df[,1], breaks = 30)
+hist(spike_df[,1], breaks = 30)
+
+
+nospike_classA <- nospike_df[, 1:9]
+nospike_classB <- nospike_df[, 10:18]
+freq_nonzero1 <- table(rowSums(nospike_classA != 0))
+freq_nonzero2 <- table(rowSums(nospike_classB != 0))
+graphics::barplot(freq_nonzero1, names.arg = freq_nonzero1,
+                  cex.names = 0.7, space = 0)
+freq_nonzero1
 # 3D density plot
 plot_3d <- MASS::kde2d(A,M)
 persp3d(plot_3d)
+
+# Mixture models
+
+# Non-spikein probesets
+index <- which.max(density(qnorm_nospike[,1])$y)
+max_classA <- density(qnorm_nospike[,1])$x[index]
+index <- which.max(density(qnorm_nospike[,18])$y)
+max_classB <- density(qnorm_nospike[,18])$x[index]
+
+# MOM estimator of shape and rate parameter
+gamma_shape <- (mean(qnorm_nospike[,1])^2)/var(qnorm_nospike[,1])
+gamma_rate <- mean(qnorm_nospike[,1])/var(qnorm_nospike[,1])

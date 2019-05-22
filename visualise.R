@@ -289,3 +289,12 @@ save_plot("dump/before.eps", before_norm,
 
 # SAVE --------------------------------------------------------------------
 save_eps(boxplot(df), "dump/test.eps")
+
+# Plot PDF ----------------------------------------------------------------
+density_nospike <- plot_density(qnorm_nospike) + xlim(0, 7)
+  geom_vline(xintercept = max_classA) +
+  geom_vline(xintercept = max_classB) +
+  stat_function(fun = dgamma, n = 500,
+                args = list(shape = gamma_shape, rate = gamma_rate),
+                col = "blue") +
+  xlim(0, 7)
