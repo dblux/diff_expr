@@ -185,14 +185,14 @@ calc_logfc <- function(df1, df2, prior_value = 0.1, func = mean) {
 
 # Argument: Recorded plot
 # Save figure as file format indicated
-save_fig <- function(recorded_plot, fpath, fig_width = 8, fig_height = 5) {
+save_fig <- function(recorded_plot, fpath, width = 8, height = 5) {
   if (endsWith(fpath, ".eps")) {
     setEPS()
-    postscript(fpath, width = fig_width, height = fig_height)
+    postscript(fpath, width = width, height = height)
     replayPlot(recorded_plot)
     dev.off()
   } else if (endsWith(fpath, ".png")) {
-    png(fpath, width = fig_width, height = fig_height)
+    png(fpath, width = width, height = height)
     replayPlot(recorded_plot)
     dev.off()
   } else {
