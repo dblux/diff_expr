@@ -1,3 +1,4 @@
+# Initialisation ----------------------------------------------------------
 library(dplyr)
 library(ggplot2)
 library(reshape2)
@@ -6,38 +7,52 @@ source("functions.R")
 setwd("~/projects/phd/diff_expr/")
 
 # Data --------------------------------------------------------------------
-DATA_RPATH <- "data/platinum_spike/GSE21344/processed/mas5_original010.tsv"
+DATA_RPATH <- "data/ovarian_cancer/GSE26712/processed/mas5_original.tsv"
 raw_data <- read.table(DATA_RPATH, header = T, row.names = 1)
+colnames(raw_data)
 # Sample name -------------------------------------------------------------
-ANNOT_ID_RPATH <- "data/platinum_spike/GSE21344/processed/annot-sample_name.tsv"
+ANNOT_ID_RPATH <- "data/ovarian_cancer/GSE26712/README/annot.tsv"
 annot_sample_id <- read.table(ANNOT_ID_RPATH,
                               sep = "\t", header = T,
-                              row.names = 1, stringsAsFactors = F)
-head(annot_sample_id, 15)
+                              row.names = 2, stringsAsFactors = F)
+head(annot_sample_id, 5)
 sample_id <- sapply(colnames(raw_data), function(x) annot_sample_id[x, 1])
+
 # Mapped row names of data
 unname(sample_id)
+
 # Ordered row names of data
 unname(sample_id)[c(66:75, 13:65)]
 # Select and order raw data
 selected_data <- raw_data[, c(66:75, 13:65)]
 colnames(selected_data)
+
 # Assigned short IDs
-short_id <- c(paste0("A", 1:10), paste0("B", 1:53))
-annot_accession <- data.frame(colnames(selected_data), short_id)
+short_id <- c(paste0("A", 1:10), paste0("B", 1:185))
+short_id
+annot_accession <- data.frame(geo_accession = colnames(raw_data), short_id = short_id)
+annot_accession
 # Write annotation to file
-ANNOT_ID_WPATH <- "data/ovarian_cancer/GSE18521/processed/annot-accession.tsv"
+ANNOT_ID_WPATH <- "data/ovarian_cancer/GSE26712/processed/annot-shortid.tsv"
 write.table(annot_accession, ANNOT_ID_WPATH,
-            sep = "\t", row.names = F, col.names = F, quote = F)
+            sep = "\t", row.names = F, col.names = T, quote = F)
 
 # Change colnames of data
-# colnames(selected_data) <- short_id
-colnames(raw_data) <- sample_id
+colnames(raw_data) <- short_id
 
-# Batch/class information
-BATCH_INFO <- rep(1:6, each = 3)
+# Reorder columns ---------------------------------------------------------
+# MAQC - Ref
+sample_id <- colnames(raw_data)
+order_index <- c(which(grepl("A[0-9]$", sample_id)), which(grepl("B[0-9]$", sample_id)))
+ordered_data <- raw_data[, order_index]
+colnames(ordered_data)
+
+# Batch information -------------------------------------------------------
+BATCH_INFO <- rep(1:2, c(10,185))
+# BATCH_INFO <- rep(rep(1:6, each = 5), 2)
 print(BATCH_INFO)
-# QC: Class A ------------------------------------------------------------
+
+# Visualisation ----------------------------------------------------------
 # Evaluation: Normalisation
 # Assumes that dataframe has been log-transformed
 plot_evaluation <- function(df, batch_info) {
@@ -59,7 +74,7 @@ plot_evaluation <- function(df, batch_info) {
               geom_point(show.legend = F) + 
               theme(axis.text.x = element_text(angle = 90, hjust = 1))
   # Principal component analysis
-  col_logical <- apply(t(df), 2, sum) != 0
+  col_logical <- apply(t(df), 2, sum) != 0 & apply(t(df), 2, var) != 0
   pca_df <- t(df)[, col_logical]
   pca_obj <- prcomp(pca_df, center = T, scale. = T)
   top_pc <- as.data.frame(pca_obj$x[,1:4])
@@ -75,21 +90,22 @@ plot_evaluation <- function(df, batch_info) {
 }
 
 before_norm <- plot_evaluation(log2_transform(raw_data), BATCH_INFO)
-save_plot("dump/platinum_mas-before.eps", before_norm,
+save_plot("dump/GSE26712-before.eps", before_norm,
           base_height = 12, base_width = 8)
 
 # Normalisation -----------------------------------------------------------
-colnames(selected_data)
-norm_classA <- norm_quantile(fltr_platinum[, 1:9])
-norm_classB <- norm_quantile(fltr_platinum[, 10:18])
-norm_data <- cbind(norm_classA, norm_classB)
-after_norm <- plot_evaluation(log2_transform(norm_data), BATCH_INFO)
-save_plot("dump/platinum_mas-afternorm.eps", after_norm,
-          base_height = 12, base_width = 8)
+colnames(raw_data)
+classA <- raw_data[, 1:10]
+classB <- raw_data[, 11:195]
 
-DATA_WPATH <- "data/platinum_spike/GSE21344/processed/qnorm_mas5_010.tsv"
-write.table(norm_data, DATA_WPATH,
-            sep = "\t", quote = F, col.names = T, row.names = T)
+norm_classA <- norm_quantile(classA)
+norm_classB <- norm_quantile(classB)
+norm_data <- cbind(norm_classA, norm_classB)
+ncol(norm_data)
+
+# DATA_WPATH <- "data/platinum_spike/GSE21344/processed/qnorm_mas5_010.tsv"
+# write.table(norm_data, DATA_WPATH,
+#             sep = "\t", quote = F, col.names = T, row.names = T)
 
 # Remove probesets --------------------------------------------------------
 # Filters out ambiguous and AFFY probesets from dataframe
@@ -102,29 +118,30 @@ filter_probesets <- function(df) {
 }
 
 # tail(rownames(platinum_spike))
-fltr_data <- filter_probesets(selected_data)
+fltr_data <- filter_probesets(norm_data)
 
 # Map probesets to IDs ----------------------------------------------------
-# # Removes ambiguous probesets and probesets with no ID
-# # Selects maximum if two probesets match to same gene
-# # CHECK: What microarray platform is the data from?
-# ANNOT_PROBESET_RPATH <- "../info/microarray/HG-U133_Plus_2/annot_entrez-GPL570.tsv"
-# annot_data <- affy2id(fltr_data, ANNOT_PROBESET_RPATH)
+# Removes ambiguous probesets and probesets with no ID
+# Selects maximum if two probesets match to same gene
+# CHECK: What microarray platform is the data from?
+ANNOT_PROBESET_RPATH <- "../info/microarray/HG-U133A/annot_entrez-GPL96.tsv"
+annot_data <- affy2id(fltr_data, ANNOT_PROBESET_RPATH)
 
-# Filter for total set of spiked in cRNA
-LABEL_RPATH <- "data/platinum_spike/GSE21344/processed/probeset_foldchange_full.tsv"
-annot_label <- read.table(LABEL_RPATH, sep = "\t", header = F,
-                          row.names = 1, stringsAsFactors = F)
-# Total set of spiked in cRNA
-spikein_probeset <- rownames(annot_label)
-fltr_platinum <- raw_data[rownames(raw_data) %in% spikein_probeset,]
-# rm_platinum <- raw_data[!(rownames(raw_data) %in% spikein_probeset),]
+# # Filter for total set of spiked in cRNA
+# LABEL_RPATH <- "data/platinum_spike/GSE21344/processed/probeset_foldchange_full.tsv"
+# annot_label <- read.table(LABEL_RPATH, sep = "\t", header = F,
+#                           row.names = 1, stringsAsFactors = F)
+# # Total set of spiked in cRNA
+# spikein_probeset <- rownames(annot_label)
+# fltr_platinum <- norm_data[rownames(norm_data) %in% spikein_probeset,]
 
-plot_fltr <- plot_evaluation(log2_transform(fltr_platinum), BATCH_INFO)
-save_plot("dump/platinum_mas5-fltr.eps", plot_fltr,
+plot_fltr <- plot_evaluation(log2_transform(annot_data), BATCH_INFO)
+save_plot("dump/GSE26712-after.eps", plot_fltr,
           base_height = 12, base_width = 8)
 
-write.table(annot_data, "data/ovarian_cancer/GSE18521/processed/qnorm_data.tsv",
+PROCESSED_DATA_WPATH <- sub("processed/.*$", "processed/mas5_qnorm.tsv", DATA_RPATH)
+print(PROCESSED_DATA_WPATH)
+write.table(annot_data, PROCESSED_DATA_WPATH,
             sep = "\t", quote = F, col.names = T, row.names = T)
 
 # TODO: Normalise before filtering for probesets or vice versa???

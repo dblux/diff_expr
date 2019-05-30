@@ -147,10 +147,11 @@ ttest_onesample <- function(vector, mu) {
     return (NaN)
   }
   if (t_stat < 0) {
-    p_value <- pt(t_stat, n-1) *2
+    p_value <- pt(t_stat, n-1) * 2
   } else if (t_stat > 0) {
-    p_value <- (1-pt(t_stat, n-1))*2
+    p_value <- (1-pt(t_stat, n-1)) * 2
   } else {
+    # t_stat == 0
     p_value <- 1
   }
   return (p_value)
@@ -275,3 +276,34 @@ log2_transform <- function(df) {
   log2_df[logical_df] <- 0
   return(log2_df)
 }
+
+# Trimmed mean scaling
+# Non-log values
+norm_scaling <- function(df, target_mean = 500, trim_percentage = 0.02) {
+  trimmed_mean <- apply(df, 2, mean, trim = trim_percentage)
+  scaling_factor <- target_mean/trimmed_mean
+  return(mapply(function(a,b) a*b, df, scaling_factor))
+}
+
+# Substring without n last characters
+substring_head <- function(string, n) {
+  return(substring(string, 1, nchar(string) - n))
+}
+
+# Plot venn diagram
+jacc_coeff <- function(vec1, vec2) {
+  # Generate overlap list
+  overlap_list <- calculate.overlap(list(vec1,vec2))
+  # Calculate venndiagram areas
+  venn_area <- sapply(overlap_list, length)
+  grid.newpage()
+  venn_plot <- draw.pairwise.venn(venn_area[1], venn_area[2], venn_area[3],
+                                  category = c("D1", "D2"),
+                                  cex = 3, fontfamily = "sans",
+                                  cat.cex = 3, cat.fontfamily = "sans",
+                                  margin = 0.1)
+  union <- (venn_area[1] + venn_area[2] - venn_area[3])
+  print(unname(venn_area[3]/union))
+  return(venn_plot)
+}
+

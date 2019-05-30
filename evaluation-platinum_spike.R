@@ -1,7 +1,8 @@
-# Import ------------------------------------------------------------------
+# Initialise --------------------------------------------------------------
 library(ggplot2)
 library(cowplot)
 library(reshape2)
+library(samr)
 # library(rgl)
 setwd("~/projects/phd/diff_expr/")
 source("functions.R")
@@ -13,17 +14,9 @@ qnorm_data <- read.table(DATA_RPATH, header = T,
 classA <- qnorm_data[, 1:9]
 classB <- qnorm_data[, 10:18]
 
-apply(classA, 2, sort)[13690:14000,]
-
-
-exp_data <- 2^qnorm_data
-classA <- exp_data[, 1:9]
-classB <- exp_data[, 10:18]
-
-# Dataset with relaxed P call threshold
-DATA_RPATH1 <- "data/platinum_spike/GSE21344/processed/qnorm_mas5_010.tsv"
+DATA_RPATH1 <- "data/platinum_spike/GSE21344/processed/mas5_no_norm.tsv"
 qnorm_data1 <- read.table(DATA_RPATH1, header = T,
-                          row.names = 1, stringsAsFactors = F)
+                         row.names = 1, stringsAsFactors = F)
 classA1 <- qnorm_data1[, 1:9]
 classB1 <- qnorm_data1[, 10:18]
 
@@ -100,6 +93,16 @@ predict_ttest <- pvalue_ttest <= 0.05
 predict_ttest[is.na(predict_ttest)] <- F
 sum(predict_ttest)
 
+pvalue_ttest <- row_ttest(classA, classB)
+predict_ttest <- pvalue_ttest <= 0.05
+# Converts NA labels to F labels
+predict_ttest[is.na(predict_ttest)] <- F
+sum(predict_ttest)
+
+# Expression data of genes that were not predicted correctly
+false_negative <- qnorm_data[!(predict_ttest == binary_label) & binary_label,]
+false_positive <- qnorm_data[!(predict_ttest == binary_label) & !binary_label,]
+
 # LogFC
 # Depends on whether mean or median is used
 foldchange_median <- calc_logfc(classA, classB, func = median)
@@ -122,6 +125,35 @@ eval_ttest <- evaluation_report(predict_ttest, binary_label)
 eval_logfc <- evaluation_report(predict_logfc, binary_label)
 
 abline(h = 0.87, v = 0.62)
+
+
+# SAMR --------------------------------------------------------------------
+# Data has to be log2 transformed before input
+log_data <- log2_transform(qnorm_data)
+# Create samr data file
+samr_data <- list(x = data.matrix(qnorm_data),
+                  y = rep(1:2, c(9,9)),
+                  geneid = row.names(qnorm_data),
+                  genenames = row.names(qnorm_data),
+                  logged2 = T)
+# Create samr data object
+samr_obj <- samr(samr_data, resp.type = "Two class unpaired", nperms = 100)
+# Delta represents the threshold distance in the qq-plot
+delta_table <- samr.compute.delta.table(samr_obj)
+# From the delta table, decide threshold threshold based on FDR
+delta_table
+
+delta <- 0.4
+samr.plot(samr_obj, delta)
+deg_table <- samr.compute.siggenes.table(samr_obj, delta, samr_data, delta_table)
+str(deg_table)
+up_genes <- deg_table$genes.up[,2]
+down_genes <- deg_table$genes.lo[,2]
+# DE genes identified by SAMR
+deg_samr <- union(up_genes, down_genes)
+# Prediction vector by SAMR
+predict_samr <- rownames(qnorm_data) %in% deg_samr
+evaluation_report(predict_samr, binary_label)
 
 # Robust statistics -------------------------------------------------------
 foldchange_mean <- calc_logfc(classA, classB, func = mean)

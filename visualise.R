@@ -298,3 +298,72 @@ density_nospike <- plot_density(qnorm_nospike) + xlim(0, 7)
                 args = list(shape = gamma_shape, rate = gamma_rate),
                 col = "blue") +
   xlim(0, 7)
+  
+# PLOT - Rgraphviz---------------------------------------------------------
+# Copy default Rgraphviz attributes
+graph_attr <- getDefaultAttrs()
+# Alter Rgraphviz attributes
+graph_attr$graph$bgcolor <- "white"
+graph_attr$node$fontsize <- 50
+# Make node attributes
+node_attr <- makeNodeAttrs(hsa04664, shape = "ellipse", fillcolor = "#e0e0e0")
+# Plot with attributes
+plot(hsa, attrs=graph_attr, nodeAttrs = node_attr)
+
+# Visualise subnetworks
+# Plot multiple
+# png("subnetworks.png", width = 1200, height = 1000)
+par(mfrow = c(6,5))
+for (i in 1:length(hsa_subnetwork_ls)) {
+  plot(ftM2graphNEL(data.matrix(i)))
+}
+dev.off()
+
+# Plot single subnetwork
+graph <- ftM2graphNEL(data.matrix(hsa_subnetwork_ls[[1]]))
+plot(graph)
+
+# PLOT - igraph -----------------------------------------------------------
+# Plotting using igraph. Continuous vector of edges
+pw250 <- as.character(as.vector(t(data.matrix(all_pwAPI[[250]]))))
+pw251 <- as.character(as.vector(t(data.matrix(all_pwAPI[[251]]))))
+g2 <- graph(pw250, directed = F)
+plot.igraph(g2)
+
+# Plotting using RGraphviz
+g250 <- ftM2graphNEL(data.matrix(all_pwAPI[[250]]))
+plot(g250)
+g251 <- ftM2graphNEL(data.matrix(all_pwAPI[[251]]))
+plot(g251)
+
+plot(hsa)
+
+# Plot star graph using igraph
+star31 <- make_star(6, mode = "undirected")
+plot.igraph(star31, edge.width = 3, edge.color = "black",
+            vertex.label=NA, vertex.size=20)
+
+
+# Venn diagram ------------------------------------------------------------
+library(VennDiagram)
+jacc_coeff <- function(vec1, vec2) {
+  # Generate overlap list
+  overlap_list <- calculate.overlap(list(vec1,vec2))
+  # Calculate venndiagram areas
+  venn_area <- sapply(overlap_list, length)
+  grid.newpage()
+  venn_plot <- draw.pairwise.venn(venn_area[1], venn_area[2], venn_area[3],
+                                  category = c("D1", "D2"),
+                                  cex = 3, fontfamily = "sans",
+                                  cat.cex = 3, cat.fontfamily = "sans",
+                                  margin = 0.1)
+  union <- (venn_area[1] + venn_area[2] - venn_area[3])
+  print(unname(venn_area[3]/union))
+  return(venn_plot)
+}
+
+grid.newpage()
+grid.draw(venn_plot)
+venn <- recordPlot()
+fpath <- sprintf("dump/venn%s.png", i)
+save_fig(venn, fpath, 600, 600)

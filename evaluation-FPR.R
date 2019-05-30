@@ -6,7 +6,7 @@ library(dplyr)
 source("functions.R")
 setwd("~/projects/phd/diff_expr/")
 
-# Split subset of class A samples into two
+# Split samples into two in a way that nullifies batch effects
 split_adhoc <- function(df) {
   id <- colnames(df)
   col_fltr <- grepl("(1|2)$", id) | grepl("X[1-3]_.3", id)
@@ -15,35 +15,33 @@ split_adhoc <- function(df) {
 
 # FALSE POSITIVE RATE -----------------------------------------------------
 # MAQC data set
-# Quantile normalised: Log2
 # AFX_1_A1: Site 1 Sample A Replicate 1
 # 6 different test sites
 # A: UHRR, B: HBRR, C & D: Mixture, N: Normal, T: Tumour
 # 5 technical replicates for each sample type
-raw_classA <- read.table('data/MAQC-I/processed/classA_entrez.tsv',
-                   header = T, row.names = 1)
-exp_classA <- 2^raw_classA
-a_ls <- split_adhoc(exp_classA)
+raw_data <- read.table('data/MAQC-I/processed/mas5_qnorm-ref.tsv',
+                       header = T, row.names = 1)
+classA <- raw_data[, 1:30]
+
+a_ls <- split_adhoc(classA)
 a1 <- a_ls[[1]]
 a2 <- a_ls[[2]]
-a3 <- exp_classA[,1:15]
-a4 <- exp_classA[,16:30]
-a5 <- exp_classA[,1:5]
-a6 <- exp_classA[,6:10]
+a3 <- classA[,1:15]
+a4 <- classA[,16:30]
+a5 <- classA[,1:5]
+a6 <- classA[,6:10]
 # 5 batches providing 1 technical replicate each
-a7 <- a1[,endsWith(colnames(a1), "_A1")][,1:5]
+a7 <- classA[, endsWith(colnames(classA), "_A1")][,1:5]
 colnames(a7)
 
-raw_classB <- read.table('data/MAQC-I/processed/classB_entrez.tsv',
-                         header = T, row.names = 1)
-exp_classB <- 2^raw_classB
-b_ls <- split_adhoc(exp_classB)
+classB <- raw_data[, 31:60]
+b_ls <- split_adhoc(classB)
 b1 <- b_ls[[1]]
 b2 <- b_ls[[2]]
-b3 <- exp_classB[,1:15]
-b4 <- exp_classB[,16:30]
-b5 <- exp_classB[,1:5]
-b6 <- exp_classB[,6:10]
+b3 <- classB[,1:15]
+b4 <- classB[,16:30]
+b5 <- classB[,1:5]
+b6 <- classB[,6:10]
 
 raw_data <- cbind(raw_classA, raw_classB)
 eval_plot <- plot_evaluation(raw_data)
@@ -305,8 +303,10 @@ rank_stability <- function(df, plot_label) {
   rank_mean <- apply(ranked_df, 1, mean)
   # Rank coefficient of variation
   rank_cv <- rank_sd/rank_mean
+  # Number of zeros
+  col_index <- apply(df, 1, function(x) sum(x == 0)) + 1
   plot(rank_mean, rank_sd,
-       main = plot_label)
+       main = plot_label, col = col_index)
   # Plot 3D density plot
   # Range of ranks
   rank_max <- apply(ranked_df, 1, max)
@@ -320,6 +320,7 @@ rank_stability <- function(df, plot_label) {
 par(mfrow = c(1,2))
 rank_stability(a5, "Within batch")
 rank_stability(a7, "Across 5 batches")
-mean_cv <- recordPlot()
-save_fig(mean_cv, "dump/mean_sd-batch_effects.eps",
-         fig_width = 9, fig_height = 4.5)
+mean_sd <- recordPlot()
+save_fig(mean_sd, "dump/rank-batch_effects.eps",
+         width = 9, height = 4.5)
+
