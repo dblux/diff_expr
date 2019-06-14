@@ -99,3 +99,7 @@ A <- exp(x)
 plot(density(log(A)),
      xlim = c(0,5))
 
+# P-values of null distribution follow a uniform distribution
+null_pvalue <- replicate(100000, t.test(rnorm(50), rnorm(50))$p.value)
+hist(null_pvalue)
+

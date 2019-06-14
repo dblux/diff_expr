@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 library(dplyr)
-# FUNCTIONS ---------------------------------------------------------------
 
 # Used in GFS function. Bins score with range [0,1] into intervals
 # E.g. 4 Intervals: Binned into 0.2, 0.4, 0.6, 0.8
@@ -15,9 +14,9 @@ bin <- function(score, num_intervals) {
 # Gene Fuzzy Scoring function transforms gene expression values
 # Wilson Goh's paper
 # Dense rank is used
-GFS <- function(A, upper=0.05, lower=0.15, num_intervals=0) {
-  print(sprintf("Top %.2f of expressed genes are assigned GFS scores of 1", upper))
-  print(sprintf("Genes below the top %.2f of expressed genes are assigned GFS scores of 0", lower))
+norm_gfs <- function(A, upper=0.05, lower=0.15, num_intervals=0) {
+  cat(sprintf("Top %.2f of expressed genes are assigned GFS scores of 1\n", upper))
+  cat(sprintf("Genes below the top %.2f of expressed genes are assigned GFS scores of 0\n", lower))
   # Rank function ranks largest value as 1 [-A is used]
   # Handle NaN?
   ranked_A <- apply(-A, 2, dense_rank)
@@ -307,3 +306,31 @@ jacc_coeff <- function(vec1, vec2) {
   return(venn_plot)
 }
 
+# Side effects: Writes KEGG pathway dataframes (Entrez)
+kegg_df <- function(kegg_fpath) {
+  pathway_id <- substring(kegg_fpath, 29, 36)
+  wpath <- sprintf("../info/KEGG/hsa_df/%s.tsv", pathway_id)
+  # Parses file into dataframe
+  df_hsa <- parseKGML2DataFrame(kegg_fpath)
+  # Convert KEGG ID to Entrez ID
+  df_hsa$from <- substring(df_hsa$from, 5)
+  df_hsa$to <- substring(df_hsa$to, 5)
+  write.table(df_hsa, wpath,
+              quote = F, sep = "\t", row.names = F)
+}
+
+# Returns: ggplot2 of PCA plot
+plot_pca <- function(df, batch_info) {
+  # Principal component analysis
+  # Removes columns with all zeroes
+  col_logical <- apply(t(df), 2, var) != 0
+  pca_df <- t(df)[, col_logical]
+  pca_obj <- prcomp(pca_df, center = T, scale. = T)
+  top_pc <- as.data.frame(pca_obj$x[,1:2])
+  pc1_pc2 <- ggplot(top_pc, aes(x = PC1, y = PC2, col = factor(batch_info))) +
+    geom_point(size = 2, show.legend = F) +
+    geom_label(label = rownames(pca_obj$x),
+               nudge_x = 1, nudge_y = 2, size = 4,
+               show.legend = F)
+  return(pc1_pc2)
+}

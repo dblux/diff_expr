@@ -12,7 +12,7 @@ setwd("~/projects/phd/diff_expr/")
 # Some subnetworks have less than size of 5! (Directed edges)
 # Allow for both directions reg -> effector and effector -> reg
 # Receives a df that has two columns from and to
-subnetwork_nea <- function(pathway_df, list_microarray = 1, min_size = 5) {
+subnetwork_nea <- function(pathway_df, list_microarray, min_size = 5) {
   # Selects edges where both nodes are present in the microarray
   fltr_pathway <- pathway_df[pathway_df$from %in% list_microarray & pathway_df$to %in% list_microarray,]
   # Assumes there are no loops in the graph
@@ -50,12 +50,12 @@ subnetwork_nea_kegg <- function(kegg_fpath, genes_microarray, min_size) {
     # Convert KEGG ID to Entrez ID
     df_hsa$from <- substring(df_hsa$from, 5)
     df_hsa$to <- substring(df_hsa$to, 5)
-    unwanted_edges <- c("phosphorylation", "indirect effect", "dephosphorylation",
-                        "ubiquitination", "methylation", "state change", "missing interaction")
+    # unwanted_edges <- c("phosphorylation", "indirect effect", "dephosphorylation",
+    #                     "ubiquitination", "methylation", "state change", "missing interaction")
     # Removes unwanted edges and loops in graph
-    processed_df <- df_hsa[!(df_hsa$subtype %in% unwanted_edges) & !(df_hsa$from == df_hsa$to), 1:2]
+    processed_df <- df_hsa[!(df_hsa$from == df_hsa$to), 1:2]
     # Remove duplicated edges
-    concat_str <- with(processed_df, paste0(from, to))
+    concat_str <- paste0(processed_df[,1], processed_df[,2])
     freq <- table(concat_str)
     dup_str <- names(freq[freq > 1])
     if (length(dup_str) == 1) {
@@ -63,12 +63,15 @@ subnetwork_nea_kegg <- function(kegg_fpath, genes_microarray, min_size) {
       # Returns df with row removed
       processed_df <- processed_df[-row_no,]
     } else if (length(dup_str) > 1) {
+      all_rows <- vector()
       for (i in dup_str) {
         row_no <- which(concat_str == i)[-1]
-        # Returns df with row removed
-        processed_df <- processed_df[-row_no,]
+        all_rows <- c(all_rows, row_no)
       }
+      # Returns df with row removed
+      processed_df <- processed_df[-all_rows,]
     }
+    
     # Create subnetworks
     subnetwork_ls <- subnetwork_nea(processed_df, genes_microarray, min_size)
     if (length(subnetwork_ls) != 0) {
@@ -91,7 +94,6 @@ subnetwork_nea_kegg <- function(kegg_fpath, genes_microarray, min_size) {
 kegg_nea_raw <- lapply(all_keggxml, subnetwork_nea_kegg, GENES_MICROARRAY, 5)
 # Omit NULL values from list (from pathways without subnetworks)
 kegg_nea_list <- kegg_nea_raw[!sapply(kegg_nea_raw, is.null)]
-str(kegg_nea_list)
 
 # Vertically stack list of dataframes to consolidate
 df_subnetworks <- do.call(rbind, kegg_nea_list)
@@ -174,7 +176,7 @@ num_fltr_subnetwork <- length(unique(fltr_df$subnetwork_id))
 print(paste0("Total no. of subnetworks after: ", num_fltr_subnetwork))
 
 # Save filtered subnetworks
-write.table(fltr_df, "data/subnetwork/nea-hsa/ovarian_cancer/subnetwork-ovarian.tsv",
+write.table(fltr_df, "data/subnetwork/nea-hsa/ovarian_cancer/subnetworks-ovarian.tsv",
             quote = F, sep = "\t", row.names = F, col.names = T)
 
 # NEA - PWAPI -------------------------------------------------------------
@@ -206,11 +208,13 @@ for (j in 1:length(list_pwAPI)) {
       # Returns df with row removed
       processed_df <- processed_df[-row_no,]
     } else if (length(dup_str) > 1) {
+      all_rows <- vector()
       for (i in dup_str) {
         row_no <- which(concat_str == i)[-1]
-        # Returns df with row removed
-        processed_df <- processed_df[-row_no,]
+        all_rows <- c(all_rows, row_no)
       }
+      # Returns df with row removed
+      processed_df <- processed_df[-all_rows,]
     }
     # Create subnetworks
     MIN_SIZE <- 5

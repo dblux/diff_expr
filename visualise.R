@@ -323,6 +323,54 @@ dev.off()
 graph <- ftM2graphNEL(data.matrix(hsa_subnetwork_ls[[1]]))
 plot(graph)
 
+# Plot subnetworks generated from pfsnet
+library(Rgraphviz)
+df_A <- read.table("data/subnetwork/pfsnet/edgelist-KEGG_GSE18521_A.tsv", header = T)
+list_subnetworks_A <- split(df_A[,2:3], df_A[,1])
+list_arr_A <- lapply(list_subnetworks_A, data.matrix)
+
+# Copy default Rgraphviz attributes
+graph_attr <- getDefaultAttrs()
+# Alter Rgraphviz attributes
+graph_attr$graph$bgcolor <- "white"
+graph_attr$node$fontsize <- 14
+
+n <- length(list_arr_A)
+par(mfrow = c(3,4), mai = c(0.4, 0.2, 0.4, 0.2))
+for (i in 1:n) {
+  # title <- sprintf("%s (%.4f)", rownames(null_AnB_arr)[i], geneset_AnB_pvalue[i])
+  plot(ftM2graphNEL(list_arr_A[[i]]), attrs = graph_attr)
+  # Plot t-statistic
+  if (i %in% c(12*1:n%/%12, n)) {
+    fig <- recordPlot()
+    fig_wpath <- sprintf("dump/subnetworkA_%d.eps", i)
+    save_fig(fig, fig_wpath, width = 10, height = 8)
+  }
+}
+
+df_B <- read.table("data/subnetwork/pfsnet/edgelist-KEGG_GSE18521_B.tsv", header = T)
+list_subnetworks_B <- split(df_B[,2:3], df_B[,1])
+list_arr_B <- lapply(list_subnetworks_B, data.matrix)
+
+n <- length(list_arr_B)
+par(mfrow = c(3,4), mai = c(0.4, 0.2, 0.4, 0.2))
+for (i in 1:n) {
+  # title <- sprintf("%s (%.4f)", rownames(null_AnB_arr)[i], geneset_AnB_pvalue[i])
+  plot(ftM2graphNEL(list_arr_B[[i]]), attrs = graph_attr)
+  # Plot t-statistic
+  if (i %in% c(12*1:n%/%12, n)) {
+    fig <- recordPlot()
+    fig_wpath <- sprintf("dump/subnetworkB_%d.eps", i)
+    save_fig(fig, fig_wpath, width = 10, height = 8)
+  }
+}
+
+freq <- table(paste0(df_B$from, df_B$to))
+ans <- lapply(list_subnetworks_B, remove_dupl_loops)
+
+list_subnetworks_B[[5]]
+
+
 # PLOT - igraph -----------------------------------------------------------
 # Plotting using igraph. Continuous vector of edges
 pw250 <- as.character(as.vector(t(data.matrix(all_pwAPI[[250]]))))
@@ -342,7 +390,6 @@ plot(hsa)
 star31 <- make_star(6, mode = "undirected")
 plot.igraph(star31, edge.width = 3, edge.color = "black",
             vertex.label=NA, vertex.size=20)
-
 
 # Venn diagram ------------------------------------------------------------
 library(VennDiagram)
