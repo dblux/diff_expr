@@ -24,5 +24,5 @@ subnetwork2geneset <- function(subnetworks_rpath, geneset_wpath) {
 
 # Run main function
 subnetwork2geneset(args[1], args[2])
-subnetwork2geneset("data/subnetwork/nea-pwapi/ovarian_cancer/subnetworks-nea_pwapi_ovarian.tsv",
-                   "data/subnetwork/nea-pwapi/ovarian_cancer/geneset-nea_pwapi_ovarian.tsv")
+subnetwork2geneset("data/subnetwork/nea-hsa/ovarian_cancer/subnetworks-nea_kegg_ovarian.tsv",
+                   "data/subnetwork/nea-hsa/ovarian_cancer/geneset-nea_kegg_ovarian.tsv")

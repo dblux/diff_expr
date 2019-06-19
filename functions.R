@@ -11,6 +11,8 @@ bin <- function(score, num_intervals) {
   }
 }
 
+# Problem: When there are too many zeros and fewer values are assigned to be 0
+# .. No zeroes will be assigned
 # Gene Fuzzy Scoring function transforms gene expression values
 # Wilson Goh's paper
 # Dense rank is used
@@ -158,14 +160,24 @@ ttest_onesample <- function(vector, mu) {
 
 # Naive row-wise two-sample t-test for every probe
 # Does a t-test between every row of matrices a and b
-# Returns a vector of p-values (length: nrow(a))
-row_ttest <- function(df1, df2) {
-  tt_pvalue <- numeric(nrow(df1))
-  names(tt_pvalue) <- rownames(df1)
-  for (i in 1:nrow(df1)) {
-    try(tt_pvalue[i] <- t.test(df1[i,], df2[i,])$p.value, silent = T)
+# Returns a vector of p-values or tstats (length: nrow(a))
+row_ttest <- function(df1, df2, flag = "pvalue") {
+  ttest_vec <- numeric(nrow(df1))
+  names(ttest_vec) <- rownames(df1)
+  if (flag == "pvalue") {
+    for (i in 1:nrow(df1)) {
+      try(ttest_vec[i] <- t.test(df1[i,], df2[i,])$p.value, silent = T)
+    }
+    ttest_vec[is.na(ttest_vec)] <- 1
+  } else if (flag == "tstat") {
+    for (i in 1:nrow(df1)) {
+      try(ttest_vec[i] <- t.test(df1[i,], df2[i,])$statistic, silent = T)
+    }
+    ttest_vec[is.na(ttest_vec)] <- 0
+  } else {
+    stop("Flag not in options pvalue or tstat..")
   }
-  return(tt_pvalue)
+  return(ttest_vec)
 }
 
 # Arguments: 2 dataframes that are not log-transformed
@@ -191,8 +203,16 @@ save_fig <- function(recorded_plot, fpath, width = 8, height = 5) {
     postscript(fpath, width = width, height = height)
     replayPlot(recorded_plot)
     dev.off()
+  } else if (endsWith(fpath, ".pdf")) {
+    pdf(fpath, width = width, height = height)
+    replayPlot(recorded_plot)
+    dev.off()
   } else if (endsWith(fpath, ".png")) {
     png(fpath, width = width, height = height)
+    replayPlot(recorded_plot)
+    dev.off()
+  } else if (endsWith(fpath, ".jpg")) {
+    jpeg(fpath, width = width, height = height)
     replayPlot(recorded_plot)
     dev.off()
   } else {
@@ -334,3 +354,7 @@ plot_pca <- function(df, batch_info) {
                show.legend = F)
   return(pc1_pc2)
 }
+
+# Min-max scaling function
+# Returns: Scaled vector with range [0,1]
+norm_minmax <- function(vec) {(vec-min(vec))/(max(vec)-min(vec))}

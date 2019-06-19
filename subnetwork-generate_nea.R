@@ -176,7 +176,7 @@ num_fltr_subnetwork <- length(unique(fltr_df$subnetwork_id))
 print(paste0("Total no. of subnetworks after: ", num_fltr_subnetwork))
 
 # Save filtered subnetworks
-write.table(fltr_df, "data/subnetwork/nea-hsa/ovarian_cancer/subnetworks-ovarian.tsv",
+write.table(fltr_df, "data/subnetwork/nea-hsa/ovarian_cancer/subnetworks-nea_kegg_ovarian.tsv",
             quote = F, sep = "\t", row.names = F, col.names = T)
 
 # NEA - PWAPI -------------------------------------------------------------

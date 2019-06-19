@@ -3,13 +3,19 @@ library(affy)
 setwd("~/projects/phd/diff_expr/")
 
 # Microarray selection ----------------------------------------------------
-CEL_DIRPATH <- "data/yeoh_2002/raw/"
+CEL_DIRPATH <- "data/ovarian_cancer/GSE26712/raw/"
 fpaths <- list.files(substring_head(CEL_DIRPATH, 1), full.names = T)
 print(fpaths)
 # # Only select sample types A and sample types B
 # subset_fpaths <- fpaths[!(grepl("C[0-9]", fpaths) | grepl("D[0-9]", fpaths))]
 # subset_fpaths
 raw_data <- ReadAffy(filenames = fpaths)
+
+# Scan dates of microarrays
+scan_dates_df <- raw_data@protocolData@data
+write.table(ordered_df, "data/ovarian_cancer/GSE26712/README/scan_date.tsv",
+            quote = F, sep = "\t", row.names = T)
+ordered_df <- scan_dates_df[order(scan_dates_df[,1]), , drop = F]
 
 # Quality control ---------------------------------------------------------
 # Visualise each microarray

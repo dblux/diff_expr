@@ -1,7 +1,9 @@
-setwd("~/projects/phd/cs6216/")
+setwd("~/projects/phd/diff_expr/")
 library(KEGGgraph)
 library(Rgraphviz)
 library(igraph)
+library(RColorBrewer)
+source("functions.R")
 
 data <- read.table('data/raw/data_entrez1.tsv',
                    header = T, sep = "\t", row.names = 1)

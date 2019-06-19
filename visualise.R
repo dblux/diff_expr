@@ -328,6 +328,7 @@ library(Rgraphviz)
 df_A <- read.table("data/subnetwork/pfsnet/edgelist-KEGG_GSE18521_A.tsv", header = T)
 list_subnetworks_A <- split(df_A[,2:3], df_A[,1])
 list_arr_A <- lapply(list_subnetworks_A, data.matrix)
+list_arr_A[1]
 
 # Copy default Rgraphviz attributes
 graph_attr <- getDefaultAttrs()

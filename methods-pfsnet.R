@@ -47,11 +47,13 @@ import_df_pathway <- function(df_rpath) {
 
 # Arguments: KEGG df directory path
 # Returns: NAMED list of KEGG pathway dataframes
+# Duplicate edges and loops removed
 import_kegg <- function(kegg_rdirpath) {
   kegg_df_rpath <- list.files(substring_head(kegg_rdirpath, 1), full.names = T)
   names(kegg_df_rpath) <- sapply(kegg_df_rpath, substring, 21, 28)
   # Returns: Processed df of SINGLE KEGG pathway
   process_kegg <- function(kegg_fpath) {
+    
     df_hsa <- read.table(kegg_fpath, header = T, sep = "\t")
     # If dataframe is not NULL
     if (nrow(df_hsa) != 0) {
@@ -333,8 +335,8 @@ pfsnet <- function(df_A, df_B, pathway_rpath, dataset_name, pathwaydb_name, min_
 # Imports data and returns two lists of top genes and gene weight matrix
 ovarian_data1 <- read.table("data/ovarian_cancer/GSE18521/processed/mas5_qnorm.tsv",
                             header = T, row.names = 1)
-ovarian1_A <- ovarian_data1[,1:10]
-ovarian1_B <- ovarian_data1[,11:20]
+ovarian1_A <- ovarian_data1[,5:10]
+ovarian1_B <- ovarian_data1[,53:58]
 
 PWAPI_FPATH <- "../info/pathwayAPI/pwapi_id_human-filtered_entrez.tsv"
 ovarian1_pwapi_pvalue <- pfsnet(ovarian1_A, ovarian1_B, PWAPI_FPATH, "GSE18521", "PWAPI")
@@ -348,11 +350,27 @@ ovarian1_pwapi_pvalue[ovarian1_pwapi_pvalue < 0.05]
 # Imports data and returns two lists of top genes and gene weight matrix
 ovarian_data1 <- read.table("data/ovarian_cancer/GSE18521/processed/mas5_qnorm.tsv",
                             header = T, row.names = 1)
-ovarian1_A <- ovarian_data1[,1:5]
-ovarian1_B <- ovarian_data1[,11:15]
+ovarian1_A <- ovarian_data1[,5:10]
+ovarian1_B <- ovarian_data1[,53:58]
 
-gfs_df_A <- norm_gfs(ovarian1_A )
-gfs_df_B <- norm_gfs(ovarian1_B)
+# Batch information
+scan_dates_df <- read.table("data/ovarian_cancer/GSE26712/README/scan_dates.tsv", sep = "\t")
+rownames(scan_dates_df) <- substring(rownames(scan_dates_df), 1, 9)
+id_annot <- read.table("data/ovarian_cancer/GSE26712/processed/annot-shortid.tsv",
+                       header = T, row.names = 1)
+simple_id <- as.character(sapply(rownames(scan_dates_df), function(x) id_annot[x,]))
+scan_dates <- cbind(simple_id, scan_dates_df)
+scan_dates
+
+# Ovarian cancer data set 2
+data2_rpath <- 'data/ovarian_cancer/GSE26712/processed/mas5_qnorm.tsv'
+ovarian_data2 <- read.table(data2_rpath, header = T, row.names = 1)
+ovarian2_classA <- ovarian_data2[,1:6]
+ovarian2_classB <- ovarian_data2[,c(23,25,26,28,29,31)]
+colnames(ovarian2_classB)
+
+gfs_df_A <- norm_gfs(ovarian2_classA )
+gfs_df_B <- norm_gfs(ovarian2_classB)
 gfs_df_AnB <- cbind(gfs_df_A, gfs_df_B)
 # Create list of highly expressed genes
 gene_weight_A <- apply(gfs_df_A, 1, mean)
@@ -362,15 +380,21 @@ highexpr_genes_B <- names(gene_weight_B[gene_weight_B > 0.5])
 # Gene weight matrix for class A and B
 original_gene_weight_df <- data.frame(A = gene_weight_A, B = gene_weight_B)
 
-GSA_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE18521_A.tsv"
+# Generate subnetworks
+# KEGGDF_RDIRPATH <- "../info/KEGG/hsa_df/"
+# list_kegg <- import_kegg(KEGGDF_RDIRPATH)
+# geneset_A_kegg <- generate_geneset(list_kegg, highexpr_genes_A, "GSE26712", "KEGG", "A", 5)
+# geneset_B_kegg <- generate_geneset(list_kegg, highexpr_genes_B, "GSE26712", "KEGG", "B", 5)
+
+GSA_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE26712_A.tsv"
 geneset_A_df <- read.table(GSA_RPATH, header = T)
 geneset_A <- split(geneset_A_df[,2], geneset_A_df[,1])
 
-GSB_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE18521_B.tsv"
+GSB_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE26712_B.tsv"
 geneset_B_df <- read.table(GSB_RPATH, header = T)
 geneset_B <- split(geneset_B_df[,2], geneset_B_df[,1])
 
-null_AnB_arr <- generate_permutation_null(gfs_df_A, gfs_df_B, geneset_A, geneset_B, 5000)
+null_AnB_arr <- generate_permutation_null(gfs_df_A, gfs_df_B, geneset_A, geneset_B, 1000)
 
 geneset_A_tstat <- unlist(mclapply(geneset_A, calc_subnetwork_tstat,
                                    "A", original_gene_weight_df, gfs_df_AnB,
@@ -383,25 +407,21 @@ geneset_B_tstat <- unlist(mclapply(geneset_B, calc_subnetwork_tstat,
 geneset_AnB_tstat <- c(geneset_A_tstat, geneset_B_tstat)
 geneset_AnB_pvalue <- empirical_pvalue(geneset_AnB_tstat, null_AnB_arr)
 
-names(geneset_AnB_pvalue)[geneset_AnB_pvalue < 0.05]
+names(geneset_AnB_pvalue)[geneset_AnB_pvalue <= 0.05]
 
 pvalue1 <- theoretical_pvalue(geneset_AnB_tstat, 20)
-names(pvalue1)[pvalue1 > 0.05]
+names(pvalue1)[pvalue1 <= 0.05]
 
-# Generate subnetworks
-KEGGDF_RDIRPATH <- "../info/KEGG/hsa_df/"
-list_kegg <- import_kegg(KEGGDF_RDIRPATH)
-geneset_A_kegg <- generate_geneset(list_kegg, highexpr_genes_A, "GSE18521", "KEGG", "A", 5)
-geneset_B_kegg <- generate_geneset(list_kegg, highexpr_genes_B, "GSE18521", "KEGG", "B", 5)
-
+# Null distribution -------------------------------------------------------
 # Visualise null distributions of t-statistic
+k <- length(geneset_AnB_pvalue)
 par(mfrow = c(2,2), mai = c(0.4, 0.4, 0.4, 0.2))
-for (i in 1:length(geneset_AnB_pvalue)) {
+for (i in 1:k) {
   title <- sprintf("%s (%.4f)", rownames(null_AnB_arr)[i], geneset_AnB_pvalue[i])
   hist(null_AnB_arr[i,], breaks = 20, main = title)
   # Plot t-statistic
   abline(v = geneset_AnB_tstat[i], col = "red")
-  if (i %in% c(4*1:26, 107)) {
+  if (i %in% c(4*1:k%/%4, k)) {
     fig <- recordPlot()
     fig_wpath <- sprintf("dump/null_distr%d.eps", i)
     save_fig(fig, fig_wpath, width = 10, height = 8)
@@ -410,6 +430,47 @@ for (i in 1:length(geneset_AnB_pvalue)) {
 
 unname(geneset_AnB_pvalue)
 
-# Visualise subnetworks
+# Visualise subnetworks ---------------------------------------------------
+# Plot subnetworks generated from pfsnet
 library(Rgraphviz)
+df_A <- read.table("data/subnetwork/pfsnet/edgelist-KEGG_GSE18521_A.tsv", header = T)
+list_subnetworks_A <- split(df_A[,2:3], df_A[,1])
+list_arr_A <- lapply(list_subnetworks_A, data.matrix)
+list_arr_A[1]
+
+# Copy default Rgraphviz attributes
+graph_attr <- getDefaultAttrs()
+# Alter Rgraphviz attributes
+graph_attr$graph$bgcolor <- "white"
+graph_attr$node$fontsize <- 14
+
+n <- length(list_arr_A)
+par(mfrow = c(3,4), mai = c(0.4, 0.2, 0.4, 0.2))
+for (i in 1:n) {
+  # title <- sprintf("%s (%.4f)", rownames(null_AnB_arr)[i], geneset_AnB_pvalue[i])
+  plot(ftM2graphNEL(list_arr_A[[i]]), attrs = graph_attr)
+  # Plot t-statistic
+  if (i %in% c(12*1:n%/%12, n)) {
+    fig <- recordPlot()
+    fig_wpath <- sprintf("dump/subnetworkA_%d.eps", i)
+    save_fig(fig, fig_wpath, width = 10, height = 8)
+  }
+}
+
+df_B <- read.table("data/subnetwork/pfsnet/edgelist-KEGG_GSE18521_B.tsv", header = T)
+list_subnetworks_B <- split(df_B[,2:3], df_B[,1])
+list_arr_B <- lapply(list_subnetworks_B, data.matrix)
+
+n <- length(list_arr_B)
+par(mfrow = c(3,4), mai = c(0.4, 0.2, 0.4, 0.2))
+for (i in 1:n) {
+  # title <- sprintf("%s (%.4f)", rownames(null_AnB_arr)[i], geneset_AnB_pvalue[i])
+  plot(ftM2graphNEL(list_arr_B[[i]]), attrs = graph_attr)
+  # Plot t-statistic
+  if (i %in% c(12*1:n%/%12, n)) {
+    fig <- recordPlot()
+    fig_wpath <- sprintf("dump/subnetworkB_%d.eps", i)
+    save_fig(fig, fig_wpath, width = 10, height = 8)
+  }
+}
 
