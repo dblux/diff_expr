@@ -103,3 +103,20 @@ plot(density(log(A)),
 null_pvalue <- replicate(100000, t.test(rnorm(50), rnorm(50))$p.value)
 hist(null_pvalue)
 
+# Quantile-quantile plot
+prob <- seq(0.001, 1 , 0.001)
+x <- qnorm(prob)
+y <- qnorm(prob, 0, 3)
+y <- qt(prob, 10)
+y <- sort(rt(1000, 3))
+
+par(mfrow = c(1,1))
+plot(x,y)
+abline(a = 0, b = 1)
+
+mix <- c(rnorm(500, mean = -3, sd = 1.5), rnorm(500, mean = 3, sd = 1.5))
+hist(mix, breaks = 50)
+
+length(x)
+plot(x, sort(mix))
+abline(a = 0, b = 1)

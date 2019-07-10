@@ -352,6 +352,7 @@ ovarian_data1 <- read.table("data/ovarian_cancer/GSE18521/processed/mas5_qnorm.t
                             header = T, row.names = 1)
 ovarian1_A <- ovarian_data1[,5:10]
 ovarian1_B <- ovarian_data1[,53:58]
+colnames(ovarian1_B)
 
 # Batch information
 scan_dates_df <- read.table("data/ovarian_cancer/GSE26712/README/scan_dates.tsv", sep = "\t")
@@ -369,8 +370,8 @@ ovarian2_classA <- ovarian_data2[,1:6]
 ovarian2_classB <- ovarian_data2[,c(23,25,26,28,29,31)]
 colnames(ovarian2_classB)
 
-gfs_df_A <- norm_gfs(ovarian2_classA )
-gfs_df_B <- norm_gfs(ovarian2_classB)
+gfs_df_A <- norm_gfs(ovarian1_A)
+gfs_df_B <- norm_gfs(ovarian1_B)
 gfs_df_AnB <- cbind(gfs_df_A, gfs_df_B)
 # Create list of highly expressed genes
 gene_weight_A <- apply(gfs_df_A, 1, mean)
@@ -386,11 +387,12 @@ original_gene_weight_df <- data.frame(A = gene_weight_A, B = gene_weight_B)
 # geneset_A_kegg <- generate_geneset(list_kegg, highexpr_genes_A, "GSE26712", "KEGG", "A", 5)
 # geneset_B_kegg <- generate_geneset(list_kegg, highexpr_genes_B, "GSE26712", "KEGG", "B", 5)
 
-GSA_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE26712_A.tsv"
+# Load saved geneset information
+GSA_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE18521_A.tsv"
 geneset_A_df <- read.table(GSA_RPATH, header = T)
 geneset_A <- split(geneset_A_df[,2], geneset_A_df[,1])
 
-GSB_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE26712_B.tsv"
+GSB_RPATH <-"data/subnetwork/pfsnet/geneset-KEGG_GSE18521_B.tsv"
 geneset_B_df <- read.table(GSB_RPATH, header = T)
 geneset_B <- split(geneset_B_df[,2], geneset_B_df[,1])
 
@@ -413,22 +415,52 @@ pvalue1 <- theoretical_pvalue(geneset_AnB_tstat, 20)
 names(pvalue1)[pvalue1 <= 0.05]
 
 # Null distribution -------------------------------------------------------
+# Q-Q plot
+prob <- 1:924/925
+theoretical_quantile <- qnorm(prob)
+
 # Visualise null distributions of t-statistic
 k <- length(geneset_AnB_pvalue)
+k <- 120
 par(mfrow = c(2,2), mai = c(0.4, 0.4, 0.4, 0.2))
 for (i in 1:k) {
   title <- sprintf("%s (%.4f)", rownames(null_AnB_arr)[i], geneset_AnB_pvalue[i])
+  # Plot null distribution histogram
   hist(null_AnB_arr[i,], breaks = 20, main = title)
   # Plot t-statistic
   abline(v = geneset_AnB_tstat[i], col = "red")
+  # Plot Q-Q plot
+  linear_reg <- lm(empirical_quantile ~ theoretical_quantile)
+  qq_title <- sprintf("%s (SSR = %.2f)", rownames(null_AnB_arr)[i], sum(linear_reg$residuals^2))
+  empirical_quantile <- sort(null_AnB_arr[i,])
+  plot(theoretical_quantile, empirical_quantile, main = qq_title)
+  abline(a = 0, b = 1)
+  abline(linear_reg$coefficients, col = "red")
   if (i %in% c(4*1:k%/%4, k)) {
     fig <- recordPlot()
-    fig_wpath <- sprintf("dump/null_distr%d.eps", i)
+    fig_wpath <- sprintf("dump/null_distr_qq%d.eps", i)
     save_fig(fig, fig_wpath, width = 10, height = 8)
   }
 }
 
+sum(linear_reg$residuals^2)
+
+
 unname(geneset_AnB_pvalue)
+a <- lm(empirical_quantile ~ theoretical_quantile)
+str(a)
+plot(-100:100)
+abline(a)
+# Q-Q plot
+prob <- 1:924/925
+theoretical_quantile <- qnorm(prob)
+
+i <- 14
+rownames(null_AnB_arr)[i]
+y <- sort(null_AnB_arr[i,])
+plot(theoretical_quantile, y)
+abline(a = 0, b = 1)
+
 
 # Visualise subnetworks ---------------------------------------------------
 # Plot subnetworks generated from pfsnet

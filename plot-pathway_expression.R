@@ -97,8 +97,26 @@ pathway_size <- sapply(list_kegg, nrow)
 sort(unname(pathway_size))
 subset_kegg <- list_kegg[pathway_size <= 1000]
 
+num_genes <- length(unique(unlist(lapply(list_kegg, unlist))))
+paste0("No. of genes represented by KEGG pathways: ", num_genes)
+
 # Have to pass in tstat_vec as list of one element
 # Otherwise tstat_vec will be accessed one by one
 # Saves plot of pathways
 mapply(plot_kegg_expr, subset_kegg, names(subset_kegg), list(tstat_vec))
+
+# DATA EXPLORATION --------------------------------------------------------
+ovarian_data <- read.table("data/ovarian_cancer/GSE18521/processed/mas5_qnorm.tsv",
+                           header = T, row.names = 1)
+ovarian_A <- ovarian_data[,5:10]
+ovarian_B <- ovarian_data[,53:58]
+
+rowSums(ovarian_data)
+
+
+hist(log2_transform(ovarian_data[,1]), breaks = 100)
+
+
+
+tstat_vec <- row_ttest(ovarian_A, ovarian_B, "tstat")
 
