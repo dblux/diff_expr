@@ -339,6 +339,41 @@ kegg_df <- function(kegg_fpath) {
               quote = F, sep = "\t", row.names = F)
 }
 
+# Assumes that dataframe has been log-transformed
+plot_evaluation <- function(df, batch_info) {
+  # Melt dataframe
+  melt_df <- melt(df, variable.name = "ID")
+  # Plot boxplot
+  boxplot <- ggplot(melt_df, aes(x = ID, y = value, col = ID)) + 
+    geom_boxplot(show.legend = F) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  # Plot density curve
+  pdf <- ggplot(melt_df, aes(x = value, col = ID)) + 
+    geom_density(show.legend = T) +
+    xlim(0, 16)
+  # Total probe intensities for each chip
+  mean_tibble <- melt_df %>% group_by(ID) %>%
+    summarise(mean = mean(value))
+  # Scatter plot
+  scatter <- ggplot(mean_tibble, aes(x = ID, y = mean, col = factor(batch_info))) +
+    geom_point(show.legend = F) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  # Principal component analysis
+  col_logical <- apply(t(df), 2, sum) != 0 & apply(t(df), 2, var) != 0
+  pca_df <- t(df)[, col_logical]
+  pca_obj <- prcomp(pca_df, center = T, scale. = T)
+  top_pc <- as.data.frame(pca_obj$x[,1:4])
+  pc1_pc2 <- ggplot(top_pc, aes(x = PC1, y = PC2, col = factor(batch_info))) +
+    geom_point(size = 3, show.legend = F)
+  pc3_pc4 <- ggplot(top_pc, aes(x = PC3, y = PC4, col = factor(batch_info))) +
+    geom_point(size = 3, show.legend = F)
+  # Plot all graphs
+  pca <- plot_grid(pc1_pc2, pc3_pc4)
+  multiplot <- plot_grid(scatter, boxplot, pdf, pca,
+                         nrow = 4)
+  return(multiplot)
+}
+
 # Returns: ggplot2 of PCA plot
 plot_pca <- function(df, batch_info) {
   # Principal component analysis
